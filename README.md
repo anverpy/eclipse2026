@@ -80,7 +80,7 @@ Partition in S3: `source=<X>/dt=2026-08-12/hour=<HH>/`
 - **Storage**: S3 (`eclipse2026-data-lake`) as data lake / landing zone, partitioned `source=<X>/dt=<date>/hour=<HH>/`, ndjson.
 - **Catalog**: Glue Data Catalog, database `eclipse2026_db`, single table `events` — **done** (`terraform/glue.tf`). No Crawler: schema is fixed (matches the unified envelope) and partitions (`source`/`dt`/`hour`) use **partition projection** instead of crawler/MSCK REPAIR — zero standing infra, no drift vs. actual S3 keys. `raw` is typed `string` (OpenX JsonSerDe auto-serializes the nested per-source JSON into it); query it with `json_extract()`.
 - **Query**: Athena — **done** (`terraform/athena.tf`). Workgroup `eclipse2026-wg`, dedicated results bucket, 1 GiB/query scanned cap (cost guardrail). Verified live against real `dt=2026-08-09` data (`ree`, `dgt_camera`).
-- **Visualization**: scope TBD (QuickSight vs. homemade dashboard) — **pending**.
+- **Visualization**: **done** — public live dashboard at [anverpy.github.io/eclipse2026](https://anverpy.github.io/eclipse2026/), GitHub Pages serving `docs/`. Not QuickSight (recurring per-author subscription cost, at odds with the pay-per-use goal, and this needed to be public anyway — GitHub Pages is free and public by default). Backed by a new `aggregator` Lambda (`terraform/aggregator.tf`) on the same EventBridge Scheduler pattern, republishing a distilled JSON snapshot (`raw` stripped) to a dedicated public S3 bucket (`terraform/public_site.tf`, public read scoped to that one object, CORS locked to the Pages origin) every 2min during the bounded windows — satisfies REE's "serve from your own server, no direct calls" condition (see source #1) since the public site never touches REE/AEMET/DGT/Trends directly.
 
 ## Key decisions already made
 
@@ -97,17 +97,15 @@ Partition in S3: `source=<X>/dt=2026-08-12/hour=<HH>/`
 
 ## Still to decide
 
-- **Minimal dashboard** (QuickSight vs. homemade) — immediate next step (Aug 10). Glue Catalog + Athena done (Aug 9, see "AWS architecture").
 - Sub-minute (10-15s) camera cadence during totality — currently 1min due to EventBridge Scheduler's `rate()` floor; would need a Lambda with an internal loop or Step Functions. Evaluate after the dry run if 1min turns out insufficient.
-- Live dashboard scope (QuickSight vs. homemade) — depends on how much time is left after Glue/Athena.
 - Rotate `andrew`'s access key (active unrotated since 2026-03-09) before closing out the project.
 
 ## Calendar (from August 7)
 
 - **Aug 7**: AEMET signup, initial technical plan, AWS account, Terraform installed. ✅
 - **Aug 8**: ESIOS token received, local dev mode (fixtures + harness). ✅
-- **Aug 9 (today)**: all 5 sources with real `fetch()`, deployed and tested live against AWS (not just `local`); EventBridge Scheduler configured and bounded to dry run + event; Glue Data Catalog + Athena table deployed and verified against live data. Ahead of today's plan. ✅
-- **Aug 10**: minimal dashboard. **Next step.**
+- **Aug 9 (today)**: all 5 sources with real `fetch()`, deployed and tested live against AWS (not just `local`); EventBridge Scheduler configured and bounded to dry run + event; Glue Data Catalog + Athena table deployed and verified against live data; public live dashboard built and deployed (aggregator Lambda + GitHub Pages, see "AWS architecture"), repo published public at [github.com/anverpy/eclipse2026](https://github.com/anverpy/eclipse2026). Ahead of today's plan. ✅
+- **Aug 10**: buffer day — nothing blocking left before the dry run.
 - **Aug 11**: full dry run in the same time slot (18:30–21:30h) — EventBridge Scheduler fires it on its own now; freeze code afterward.
 - **Aug 12 (D-day)**: monitoring only, no code changes during the event.
 
@@ -125,12 +123,13 @@ Partition in S3: `source=<X>/dt=2026-08-12/hour=<HH>/`
 ## Current status (handoff for a new chat session)
 
 - AWS account `879381241577` (alias `andrew-aws123`), Paid plan, region `eu-west-1`. Operating user: `andrew` (group `admin`, `AdministratorAccess`) — never root.
-- **Infra fully deployed** (`terraform apply` applied, nothing pending): budget, 5 IAM roles + policies, bucket `eclipse2026-data-lake`, 5 Lambdas, Pillow layer, 16 EventBridge Scheduler schedules, Glue Catalog (`eclipse2026_db.events`), Athena workgroup (`eclipse2026-wg`).
+- **Infra fully deployed** (`terraform apply` applied, nothing pending): budget, 5 IAM roles + policies, bucket `eclipse2026-data-lake`, 5 Lambdas, Pillow layer, Glue Catalog (`eclipse2026_db.events`), Athena workgroup (`eclipse2026-wg`), `aggregator` Lambda, public bucket `eclipse2026-public`, 18 EventBridge Scheduler schedules total.
+- **Public live dashboard deployed and verified**: [anverpy.github.io/eclipse2026](https://anverpy.github.io/eclipse2026/) (GitHub Pages, `docs/`), fetching `https://eclipse2026-public.s3.eu-west-1.amazonaws.com/latest.json` directly — confirmed working end-to-end against real production CORS (locked to the Pages origin only). Repo is public: [github.com/anverpy/eclipse2026](https://github.com/anverpy/eclipse2026).
 - **All 5 sources tested live** with `./admin.sh invoke <source>` — real data confirmed in S3 (`source=<X>/dt=2026-08-09/hour=.../*.json`) for all 5. Per-source detail in "Data sources" above; build history for each in CHANGELOG.md (2026-08-09).
 - **Glue/Athena layer tested live**: `SELECT ... FROM eclipse2026_db.events WHERE dt='2026-08-09'` returns real rows across sources (`ree`, `dgt_camera` confirmed) via partition projection, no crawler/MSCK needed. Note: raw `aws athena`/`aws glue` CLI calls need `--region eu-west-1` explicitly (CLI default profile region is `us-east-1`); `admin.sh`/terraform already pin the right region via `var.aws_region`.
 - EventBridge Scheduler deployed but **inert until 2026-08-11 16:30 UTC** (18:30 local) — nothing needs manual invoking until then, the scheduler fires the dry run and the event on its own.
 - Current cost: ~$0 (see `./admin.sh cost`). Nothing with a fixed hourly cost deployed; Athena is pay-per-scan with a 1 GiB/query cap.
-- **Immediate next step — this is the phase this new session is for**: minimal dashboard (QuickSight vs. homemade) over the `events` table. Ingestion + catalog + query layers are done.
-- Pending, not blocking the above: sub-minute camera cadence, dashboard scope, rotate `andrew`'s access key — see "Still to decide".
+- **Everything from README "Project goal" is done**: ingestion, catalog/query, and public visualization. Nothing blocking before the Aug 11 dry run.
+- Pending, not blocking: sub-minute camera cadence, rotate `andrew`'s access key — see "Still to decide".
 
 Change history: see [CHANGELOG.md](CHANGELOG.md).
