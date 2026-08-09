@@ -1,0 +1,22 @@
+{
+  "indicator": {
+    "values": [
+      {
+        "value": 22863.0,
+        "datetime": "2026-08-12T18:00:00.000+02:00",
+        "datetime_utc": "2026-08-12T16:00:00Z",
+        "tz_time": "2026-08-12T16:00:00.000Z",
+        "geo_id": 8741,
+        "geo_name": "Península"
+      },
+      {
+        "value": 210.8,
+        "datetime": "2026-08-12T18:35:00.000+02:00",
+        "datetime_utc": "2026-08-12T16:35:00Z",
+        "tz_time": "2026-08-12T16:35:00.000Z",
+        "geo_id": 8741,
+        "geo_name": "Península"
+      }
+    ]
+  }
+}

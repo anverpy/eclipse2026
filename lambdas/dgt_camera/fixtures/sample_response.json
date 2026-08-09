@@ -1,0 +1,20 @@
+[
+  {
+    "camera_id": "176134",
+    "province": "LEÓN",
+    "road": "A-6",
+    "lat": 42.2278,
+    "lon": -5.8148,
+    "captured_at": "2026-08-12T20:30:00Z",
+    "brightness": 122.4
+  },
+  {
+    "camera_id": "176130",
+    "province": "BURGOS",
+    "road": "A-62",
+    "lat": 42.2624,
+    "lon": -3.9403,
+    "captured_at": "2026-08-12T20:30:00Z",
+    "brightness": 8.1
+  }
+]

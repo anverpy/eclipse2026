@@ -1,0 +1,18 @@
+[
+  {
+    "id": "2816645",
+    "province": "BURGOS",
+    "cause": "roadMaintenance",
+    "ts": "2026-08-12T18:05:19.000+02:00",
+    "lat": 42.34,
+    "lon": -3.7
+  },
+  {
+    "id": "2816701",
+    "province": "ZARAGOZA",
+    "cause": "accident",
+    "ts": "2026-08-12T18:20:00.000+02:00",
+    "lat": 41.65,
+    "lon": -0.88
+  }
+]
