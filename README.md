@@ -2,9 +2,9 @@
 
 **[→ Dashboard en vivo](https://anverpy.github.io/eclipse2026/)**
 
-El **12 de agosto de 2026**, un eclipse total de Sol cruza la España peninsular en una franja estrecha desde A Coruña hasta Palma de Mallorca — el primero visible desde España en décadas. Este proyecto reúne cinco fuentes de datos públicas e independientes a lo largo de ese camino y las republica como un dashboard público y gratuito en vivo, construido de principio a fin como proyecto de portfolio en ingeniería de datos sobre AWS.
+El **12 de agosto de 2026**, un eclipse total de Sol cruza la España peninsular en una franja estrecha desde A Coruña hasta Palma de Mallorca — el primero visible desde España en décadas. Este proyecto reúne cinco fuentes de datos públicas e independientes a lo largo de ese camino y las republica como un dashboard público y en vivo
 
-No busca ser el pipeline más sofisticado posible — la prioridad de diseño explícita, de principio a fin, fue el **coste mínimo**. Todo el sistema está pensado para funcionar su único día de evento en vivo por unos pocos dólares, sobre una arquitectura serverless de pago por uso, con una alarma de presupuesto activa desde el primer día.
+Todo el sistema está pensado para funcionar su único día de evento en vivo por unos pocos dólares, sobre una arquitectura serverless de pago por uso, con una alarma de presupuesto activa desde el primer día.
 
 ## Qué datos recoge
 
@@ -20,10 +20,10 @@ Cinco fuentes públicas, todas servidas desde la infraestructura propia del proy
 
 La cobertura se limita a las 10 ciudades del camino de totalidad, más España peninsular y Palma — no es un dataset a nivel nacional, y es así a propósito.
 
-## Cómo está construido
+## 5 Fuentes de Normalización
 
 ```
-5 fuentes → Lambda (fetch + normalización) → S3 (data lake particionado)
+Fetch + normalización → S3 (data lake particionado)
                                                 │
                                                 ├── Glue Catalog + Athena (consultas SQL ad-hoc)
                                                 │
@@ -61,12 +61,20 @@ Las Lambdas de ingesta también pueden ejecutarse totalmente offline contra dato
 ./admin.sh local ree         # o solo una fuente
 ```
 
-## Qué queda fuera del alcance, a propósito
+## 🚑 Qué queda fuera del alcance, a propósito
 
 **Ingresos en urgencias hospitalarias.** Al principio, los datos de ingresos en urgencias (por nivel de triaje, motivo, hospital) parecían una métrica interesante para correlacionar con el eclipse — pero ninguna fuente en España publica eso en tiempo real, por el motivo obvio de que son datos de salud protegidos. El único portal de datos abiertos que publica algo parecido (Castilla y León, que está en el camino de totalidad) solo lo hace con actualización **mensual**, así que no puede formar parte de un pipeline en vivo.
 
-En lugar de descartar la idea del todo, el plan es publicar un pequeño informe de seguimiento en cuanto salgan los datos de ese portal correspondientes a agosto — hacia **finales de mes** — analizando específicamente los ingresos del día del eclipse. Será un análisis retrospectivo aparte, no parte del dashboard en vivo de arriba.
+#### Es importante tener las precauciones adecuadas el día del evento y evitar algún accidente por desconocimiento u omisión, ya que puede representar un riesgo real para los ojos.
 
+Aquí tienes 3 enlaces confiables con precauciones y consejos sobre la seguridad ocular durante un eclipse:
+
+NASA – Eclipse Safety — https://science.nasa.gov/eclipses/safety/
+Guía oficial de la NASA sobre cómo observar el eclipse de forma segura, uso de filtros solares certificados y cuándo es seguro mirar sin protección (solo durante la totalidad).
+</br></br>American Astronomical Society (AAS) – Eye Safety — https://eclipse.aas.org/eye-safety,.
+Explica el estándar ISO 12312-2 para gafas de eclipse, cómo detectar gafas falsificadas, y recomendaciones para fotografiar el eclipse sin dañar la vista o el equipo.
+</br></br>American Academy of Ophthalmology – Solar Eclipse Eye Safety — https://www.aao.org/eye-health/tips-prevention/solar-eclipse-eye-safety
+Perspectiva médica sobre la retinopatía solar, síntomas de daño ocular tras mirar el sol sin protección, y consejos prácticos (no usar gafas de sol normales, supervisar a los niños, etc.).
 ## Fuentes de datos y créditos
 
 - Generación eléctrica: [REE ESIOS](https://www.esios.ree.es/)
