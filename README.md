@@ -1,78 +1,78 @@
-# Eclipse 2026 — Live data pipeline for Spain's total solar eclipse
+# Eclipse 2026 — Pipeline de datos en vivo para el eclipse total de Sol en España
 
-**[→ Live dashboard](https://anverpy.github.io/eclipse2026/)**
+**[→ Dashboard en vivo](https://anverpy.github.io/eclipse2026/)**
 
-On **August 12, 2026**, a total solar eclipse crosses mainland Spain along a narrow band from A Coruña to Palma de Mallorca — the first one visible from Spain in decades. This project pulls together five independent public data sources along that path and republishes them as a free, live public dashboard, built end-to-end as a data engineering portfolio project on AWS.
+El **12 de agosto de 2026**, un eclipse total de Sol cruza la España peninsular en una franja estrecha desde A Coruña hasta Palma de Mallorca — el primero visible desde España en décadas. Este proyecto reúne cinco fuentes de datos públicas e independientes a lo largo de ese camino y las republica como un dashboard público y gratuito en vivo, construido de principio a fin como proyecto de portfolio en ingeniería de datos sobre AWS.
 
-It's not trying to be the most sophisticated pipeline possible — the explicit design priority, end to end, was **minimum cost**. The whole thing is built to run its one live event day for a few dollars, on a serverless, pay-per-use architecture, with a hard budget alarm from day one.
+No busca ser el pipeline más sofisticado posible — la prioridad de diseño explícita, de principio a fin, fue el **coste mínimo**. Todo el sistema está pensado para funcionar su único día de evento en vivo por unos pocos dólares, sobre una arquitectura serverless de pago por uso, con una alarma de presupuesto activa desde el primer día.
 
-## What it tracks
+## Qué datos recoge
 
-Five public data sources, all served from the project's own infrastructure (never proxied live from the original APIs):
+Cinco fuentes públicas, todas servidas desde la infraestructura propia del proyecto (nunca mediante llamadas directas en vivo a las APIs originales):
 
-| Source | What | Why it's here |
+| Fuente | Qué mide | Por qué está aquí |
 |---|---|---|
-| ⚡ **REE** (Red Eléctrica de España) | Real-time solar photovoltaic generation, mainland Spain | Should visibly dip during totality — the "hero" metric |
-| 🌡️ **AEMET** (Agencia Estatal de Meteorología) | Temperature at 10 stations along the totality path | The eclipse cools the air measurably as the sky darkens |
-| 🚦 **DGT Tráfico** (Dirección General de Tráfico) | Active road incidents, official national feed | People pull over to watch — does traffic behavior show it? |
-| ☀️ **DGT Cámaras** (Dirección General de Tráfico) | Mean brightness from 9 official highway cameras | The most direct read on the sky actually darkening |
-| 🔍 **Google Trends** | National search interest for "eclipse" | Public attention, before/during/after |
+| ⚡ **REE** (Red Eléctrica de España) | Generación solar fotovoltaica en tiempo real, España peninsular | Debería caer visiblemente durante la totalidad — la métrica "estrella" |
+| 🌡️ **AEMET** (Agencia Estatal de Meteorología) | Temperatura en 10 estaciones a lo largo del camino de totalidad | El eclipse enfría el aire de forma medible al oscurecerse el cielo |
+| 🚦 **DGT Tráfico** (Dirección General de Tráfico) | Incidencias activas en carretera, feed oficial nacional | La gente para a mirar — ¿se nota en el comportamiento del tráfico? |
+| ☀️ **DGT Cámaras** (Dirección General de Tráfico) | Brillo medio de 9 cámaras oficiales de carretera | El indicador más directo de que el cielo se oscurece de verdad |
+| 🔍 **Google Trends** | Interés de búsqueda nacional del término «eclipse» | Atención pública, antes/durante/después |
 
-Coverage is limited to the 10 cities along the totality path plus mainland Spain and Palma — it's not a nationwide dataset, by design.
+La cobertura se limita a las 10 ciudades del camino de totalidad, más España peninsular y Palma — no es un dataset a nivel nacional, y es así a propósito.
 
-## How it's built
-
-```
-5 sources → Lambda (fetch + normalize) → S3 (partitioned data lake)
-                                            │
-                                            ├── Glue Catalog + Athena (ad-hoc SQL queries)
-                                            │
-                                            └── aggregator Lambda → public S3 bucket → GitHub Pages dashboard
-```
-
-- **Ingestion**: one AWS Lambda per source, each polling on its own schedule via **EventBridge Scheduler**, writing directly to S3 as partitioned newline-delimited JSON. No Kinesis/Firehose/DynamoDB — a live event with a few dozen readings a minute doesn't need a streaming platform, and every extra moving part is extra cost and extra risk on event day.
-- **Cadence** tightens automatically during totality (as low as ~20s for the two highest-signal metrics — camera brightness and the dashboard snapshot) and goes fully dormant outside two bounded windows: an Aug 11 dry run and the real Aug 12 event.
-- **Storage & query**: S3 as the data lake, cataloged in Glue with **partition projection** (no crawler needed — the schema and partitioning scheme are fixed upfront), queryable ad-hoc through Athena with a scanned-data cap as a cost guardrail.
-- **Public dashboard**: a small `aggregator` Lambda distills the raw data into a lightweight public JSON snapshot, republished to a dedicated public S3 bucket every couple of minutes. The dashboard itself is a single self-contained HTML file — no frameworks, no build step, hand-rolled SVG charts — served for free on GitHub Pages.
-- **Infrastructure as code**: the entire stack (Lambdas, IAM roles, S3, Glue, Athena, EventBridge schedules, budget alarm) is defined in Terraform, so it can be stood up or fully torn down with one command.
-
-## Repo layout
+## Cómo está construido
 
 ```
-terraform/    infrastructure as code — every AWS resource used by the project
-lambdas/      one folder per data source, plus shared schema/S3-writer code
-docs/         the public dashboard (docs/index.html), served via GitHub Pages
-admin.sh      single entrypoint for infra + day-to-day ops (see below)
-CHANGELOG.md  build history and notable decisions, in chronological order
+5 fuentes → Lambda (fetch + normalización) → S3 (data lake particionado)
+                                                │
+                                                ├── Glue Catalog + Athena (consultas SQL ad-hoc)
+                                                │
+                                                └── Lambda agregadora → bucket S3 público → dashboard en GitHub Pages
 ```
 
-## Running it locally
+- **Ingesta**: una Lambda de AWS por fuente, cada una consultando según su propio horario vía **EventBridge Scheduler**, escribiendo directamente en S3 como JSON particionado línea a línea. Sin Kinesis/Firehose/DynamoDB — un evento en vivo con unas pocas decenas de lecturas por minuto no necesita una plataforma de streaming, y cada pieza adicional es más coste y más riesgo el día del evento.
+- La **cadencia** se acelera automáticamente durante la totalidad (hasta ~20s para las dos métricas de mayor señal — brillo de cámara e instantánea del dashboard) y queda totalmente inactiva fuera de dos ventanas acotadas: un simulacro el 11 de agosto y el evento real el 12.
+- **Almacenamiento y consulta**: S3 como data lake, catalogado en Glue con **partition projection** (sin crawler — el esquema y el particionado se conocen de antemano), consultable ad-hoc mediante Athena con un límite de datos escaneados como salvaguarda de coste.
+- **Dashboard público**: una pequeña Lambda `aggregator` destila los datos en bruto en una instantánea JSON pública y ligera, republicada en un bucket S3 público dedicado cada pocos minutos. El dashboard en sí es un único archivo HTML autocontenido — sin frameworks, sin build, gráficos SVG hechos a mano — servido gratis en GitHub Pages.
+- **Infraestructura como código**: todo el stack (Lambdas, roles IAM, S3, Glue, Athena, horarios de EventBridge, alarma de presupuesto) está definido en Terraform, así que se puede desplegar o destruir por completo con un solo comando.
 
-The dashboard is a static file — no build step:
+## Estructura del repositorio
+
+```
+terraform/    infraestructura como código — todos los recursos AWS del proyecto
+lambdas/      una carpeta por fuente de datos, más esquema y escritura a S3 compartidos
+docs/         el dashboard público (docs/index.html), servido vía GitHub Pages
+admin.sh      punto de entrada único para infra y operativa del día a día (ver abajo)
+CHANGELOG.md  historial de construcción y decisiones notables, en orden cronológico
+```
+
+## Cómo ejecutarlo en local
+
+El dashboard es un archivo estático — sin paso de build:
 
 ```bash
-./admin.sh preview          # serves docs/ at http://localhost:8000
+./admin.sh preview          # sirve docs/ en http://localhost:8000
 ```
 
-The ingestion Lambdas can also run fully offline against saved fixture data, with no AWS credentials or network access required:
+Las Lambdas de ingesta también pueden ejecutarse totalmente offline contra datos de prueba guardados, sin necesitar credenciales de AWS ni acceso a red:
 
 ```bash
-./admin.sh local             # runs all 5 sources against fixtures, validates the schema
-./admin.sh local ree         # or just one source
+./admin.sh local             # ejecuta las 5 fuentes contra fixtures, valida el esquema
+./admin.sh local ree         # o solo una fuente
 ```
 
-## What's deliberately out of scope
+## Qué queda fuera del alcance, a propósito
 
-**Emergency room admissions.** Early on, ER admission data (by triage level, reason, hospital) looked like a compelling metric to correlate against the eclipse — but no source in Spain publishes that in real time, for the obvious reason that it's protected health data. The one open-data portal that does publish something close (Castilla y León, which sits on the totality path) only releases it **monthly**, so it can't be part of a live pipeline.
+**Ingresos en urgencias hospitalarias.** Al principio, los datos de ingresos en urgencias (por nivel de triaje, motivo, hospital) parecían una métrica interesante para correlacionar con el eclipse — pero ninguna fuente en España publica eso en tiempo real, por el motivo obvio de que son datos de salud protegidos. El único portal de datos abiertos que publica algo parecido (Castilla y León, que está en el camino de totalidad) solo lo hace con actualización **mensual**, así que no puede formar parte de un pipeline en vivo.
 
-Rather than drop the idea entirely, the plan is to publish a short follow-up report once that portal's data for August lands — around the **end of the month** — looking specifically at admissions on eclipse day. That'll be a separate, retrospective piece of analysis, not part of the live dashboard above.
+En lugar de descartar la idea del todo, el plan es publicar un pequeño informe de seguimiento en cuanto salgan los datos de ese portal correspondientes a agosto — hacia **finales de mes** — analizando específicamente los ingresos del día del eclipse. Será un análisis retrospectivo aparte, no parte del dashboard en vivo de arriba.
 
-## Data sources & credit
+## Fuentes de datos y créditos
 
-- Electricity generation: [REE ESIOS](https://www.esios.ree.es/)
-- Weather: [AEMET OpenData](https://opendata.aemet.es/)
-- Traffic incidents & cameras: [NAP-DGT](https://nap.dgt.es/) (Punto de Acceso Nacional, Dirección General de Tráfico)
-- Search interest: Google Trends
-- Totality-path map & phase-progression reference images: [Instituto Geográfico Nacional](https://astronomia.ign.es/eclipses-de-sol-y-luna/eclipse-total-sol-de-12-de-agosto-2026)
+- Generación eléctrica: [REE ESIOS](https://www.esios.ree.es/)
+- Meteorología: [AEMET OpenData](https://opendata.aemet.es/)
+- Incidencias y cámaras de tráfico: [NAP-DGT](https://nap.dgt.es/) (Punto de Acceso Nacional, Dirección General de Tráfico)
+- Interés de búsqueda: Google Trends
+- Mapa del camino de totalidad e imagen de progresión de fases: [Instituto Geográfico Nacional](https://astronomia.ign.es/eclipses-de-sol-y-luna/eclipse-total-sol-de-12-de-agosto-2026)
 
-Full build history and design decisions are in [CHANGELOG.md](CHANGELOG.md).
+El historial completo de construcción y las decisiones de diseño están en [CHANGELOG.md](CHANGELOG.md).
