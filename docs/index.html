@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="en">
+<html lang="es">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Eclipse 2026 — Live Data</title>
-<meta name="description" content="Live multi-source data feed for the August 12, 2026 total solar eclipse across northern Spain — solar generation, temperature, traffic, camera brightness and search interest, updated every few minutes.">
+<title>Eclipse 2026 — Datos en vivo</title>
+<meta name="description" content="Datos en vivo de cinco fuentes públicas para el eclipse total de Sol del 12 de agosto de 2026 en el norte de España — generación solar, temperatura, tráfico, brillo de cámaras e interés de búsqueda, actualizados cada pocos minutos.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><circle cx=%2250%22 cy=%2250%22 r=%2242%22 fill=%22%23eda100%22/><circle cx=%2264%22 cy=%2250%22 r=%2242%22 fill=%22%230d0d0d%22/></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -39,6 +39,8 @@
 
     --font-display: "Fraunces", ui-serif, Georgia, serif;
     --font-data: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+    --vignette-color: rgba(0,0,0,0.62);
   }
   @media (prefers-color-scheme: light) {
     :root:not([data-force-dark]) {
@@ -58,6 +60,7 @@
       --hue-orange: #eb6834; --hue-orange-dim: rgba(235,104,52,0.10);
       --hue-violet: #4a3aa7; --hue-violet-dim: rgba(74,58,167,0.10);
       --hue-aqua: #1baf7a;
+      --vignette-color: rgba(20,18,10,0.14);
     }
   }
 
@@ -80,6 +83,24 @@
   }
   @media (prefers-color-scheme: light) {
     body { background-image: none; }
+  }
+
+  /* ---------- fixed astronomic vignette (frames the page while scrolling) ---------- */
+  body::before, body::after {
+    content: "";
+    position: fixed;
+    left: 0; right: 0;
+    height: clamp(120px, 20vh, 260px);
+    pointer-events: none;
+    z-index: 50;
+  }
+  body::before {
+    top: 0;
+    background: radial-gradient(ellipse 140% 100% at 50% 0%, var(--vignette-color), transparent 72%);
+  }
+  body::after {
+    bottom: 0;
+    background: radial-gradient(ellipse 140% 100% at 50% 100%, var(--vignette-color), transparent 72%);
   }
 
   a { color: var(--hue-gold); }
@@ -127,7 +148,7 @@
   .subtitle {
     font-family: var(--font-data);
     color: var(--text-secondary);
-    max-width: 560px;
+    max-width: 580px;
     margin: 18px auto 0;
     font-size: 14px;
   }
@@ -166,6 +187,16 @@
   .refresh-note { margin-top: 22px; font-size: 12px; color: var(--text-muted); }
   .refresh-note .dt { color: var(--text-secondary); }
 
+  /* ---------- per-phase countdown tiles ---------- */
+  .phase-countdowns { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-top: 30px; position: relative; }
+  .pcd-cell { min-width: 122px; padding: 13px 16px; border-radius: 12px; border: 1px solid var(--border-strong); background: var(--surface-1); text-align: center; }
+  .pcd-cell.is-active { border-color: var(--hue-gold); background: var(--hue-gold-dim); }
+  .pcd-cell.is-done { opacity: 0.4; }
+  .pcd-label { font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px; }
+  .pcd-cell.is-active .pcd-label { color: var(--hue-gold); }
+  .pcd-time { font-family: var(--font-data); font-size: 19px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text-primary); }
+  .pcd-status { font-size: 10.5px; color: var(--text-muted); margin-top: 4px; }
+
   /* ---------- sections ---------- */
   section { margin-top: 56px; }
   .section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 18px; flex-wrap: wrap; }
@@ -178,18 +209,76 @@
   }
   .section-note { font-size: 12.5px; color: var(--text-muted); max-width: 480px; }
 
-  /* ---------- stat tiles ---------- */
-  .kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
-  .kpi-tile { background: var(--surface-1); padding: 20px 20px 16px; min-height: 128px; display: flex; flex-direction: column; justify-content: space-between; }
-  .kpi-label { font-size: 11.5px; letter-spacing: 0.04em; color: var(--text-muted); text-transform: uppercase; }
-  .kpi-value-row { display: flex; align-items: baseline; gap: 6px; margin-top: 10px; }
-  .kpi-value { font-family: var(--font-display); font-size: 34px; font-weight: 560; }
-  .kpi-unit { font-size: 12.5px; color: var(--text-secondary); }
-  .kpi-delta { font-size: 11.5px; margin-top: 4px; }
-  .kpi-delta.up { color: var(--hue-gold); }
-  .kpi-delta.down { color: var(--hue-blue); }
-  .kpi-spark { margin-top: 10px; height: 30px; }
-  .kpi-empty { color: var(--text-muted); font-size: 12px; margin-top: auto; }
+  /* ---------- source legend (explainer strip) ---------- */
+  .source-legend { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px 22px; }
+  @media (max-width: 1050px) { .source-legend { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 620px) { .source-legend { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 420px) { .source-legend { grid-template-columns: 1fr; } }
+  .source-item { display: flex; gap: 10px; align-items: flex-start; }
+  .src-dot { width: 10px; height: 10px; border-radius: 50%; margin-top: 5px; flex: none; }
+  .src-logo { display: block; height: 90px; width: fit-content; max-width: 100%; background: #fff; border-radius: 9px; padding: 9px 16px; margin-bottom: 12px; }
+  .src-logo img { height: 100%; width: auto; max-width: 195px; object-fit: contain; display: block; }
+  .source-item b { display: block; font-size: 13px; color: var(--text-primary); margin-bottom: 2px; }
+  .source-item b .acr { font-weight: 400; font-size: 11.5px; color: var(--text-muted); }
+  .source-item span { font-size: 12px; color: var(--text-muted); line-height: 1.45; }
+
+  /* ---------- filter bar ---------- */
+  .filter-bar { background: var(--surface-1); border: 1px solid var(--border); border-radius: 14px; padding: 16px 20px; margin-bottom: 18px; }
+  .filter-bar-head { font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 14px; }
+  .filter-bar-head span { text-transform: none; letter-spacing: 0; }
+  .filter-groups { display: flex; flex-wrap: wrap; gap: 20px 32px; align-items: flex-start; }
+  .filter-group { display: flex; flex-direction: column; gap: 8px; }
+  .filter-label { font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-muted); }
+  .chip-row { display: flex; flex-wrap: wrap; gap: 8px; max-width: 420px; }
+  .chip {
+    font-family: var(--font-data); font-size: 12px; padding: 6px 13px; border-radius: 999px;
+    border: 1px solid var(--border-strong); background: var(--surface-2); color: var(--text-secondary);
+    cursor: pointer; transition: background 0.15s, border-color 0.15s, opacity 0.15s, color 0.15s;
+  }
+  .chip.active { background: var(--chip-color, var(--hue-gold-dim)); border-color: var(--chip-color, var(--hue-gold)); color: var(--text-primary); }
+
+  /* ---------- combined multi-source chart ---------- */
+  .combo-legend { display: flex; flex-wrap: wrap; gap: 18px; margin-bottom: 16px; }
+  .combo-legend-item { display: flex; align-items: center; gap: 7px; font-size: 12.5px; }
+  .combo-legend-item .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+  .combo-legend-item .cl-name { color: var(--text-muted); }
+  .combo-legend-item .cl-val { font-weight: 600; color: var(--text-primary); font-family: var(--font-display); font-size: 14px; }
+
+  /* ---------- city table ---------- */
+  .city-table-head, .city-table-row { display: grid; grid-template-columns: 1fr 70px 70px; gap: 10px; align-items: center; padding: 8px 4px; }
+  .city-table-head { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); border-bottom: 1px solid var(--border-strong); padding-bottom: 8px; }
+  .city-table-row { border-bottom: 1px solid var(--border); font-size: 12.5px; cursor: pointer; transition: background 0.15s; }
+  .city-table-row:last-child { border-bottom: none; }
+  .city-table-row.is-selected { background: var(--hue-gold-dim); }
+  .city-table-row .ct-name { font-weight: 600; color: var(--text-primary); }
+  .city-table-row .ct-temp { color: var(--hue-orange); }
+  .city-table-row .ct-bright { color: var(--hue-blue); }
+
+  /* ---------- before/during/after phase comparison ---------- */
+  .phase-compare { display: flex; flex-direction: column; gap: 22px; }
+  .phase-metric-title { font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 10px; }
+  .phase-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  @media (max-width: 620px) { .phase-row { grid-template-columns: repeat(2, 1fr); } }
+  .phase-cell { background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; text-align: center; }
+  .phase-cell.is-totality { background: var(--hue-gold-dim); border-color: var(--hue-gold); }
+  .phase-cell .pc-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); }
+  .phase-cell .pc-val { font-family: var(--font-display); font-size: 21px; font-weight: 560; margin-top: 5px; }
+  .phase-cell .pc-delta { font-size: 11px; margin-top: 3px; color: var(--text-muted); }
+  .phase-cell .pc-delta.down { color: var(--hue-blue); }
+  .phase-cell .pc-delta.up { color: var(--hue-gold); }
+  .phase-legend { margin-top: 4px; font-size: 11.5px; color: var(--text-muted); }
+
+  /* ---------- per-source phase record counts ---------- */
+  .phase-counts { display: flex; flex-direction: column; margin-top: 6px; }
+  .pct-head, .pct-row { display: grid; grid-template-columns: 1fr repeat(4, 64px); gap: 8px; align-items: center; padding: 7px 4px; }
+  .pct-head { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); border-bottom: 1px solid var(--border-strong); padding-bottom: 8px; }
+  .pct-head span:not(:first-child) { text-align: center; }
+  .pct-row { border-bottom: 1px solid var(--border); font-size: 12.5px; }
+  .pct-row:last-child { border-bottom: none; }
+  .pct-name { font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 7px; }
+  .pct-val { text-align: center; font-variant-numeric: tabular-nums; color: var(--text-secondary); }
+  .pct-val.is-zero { color: var(--text-muted); opacity: 0.5; }
+  @media (max-width: 480px) { .pct-head, .pct-row { grid-template-columns: 1fr repeat(4, 42px); font-size: 11px; } }
 
   /* ---------- chart card ---------- */
   .card {
@@ -206,8 +295,6 @@
 
   .chart-svg { width: 100%; height: auto; display: block; overflow: visible; }
   .chart-line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
-  .chart-area { opacity: 0.10; }
-  .chart-grid { stroke: var(--gridline); stroke-width: 1; }
   .chart-baseline { stroke: var(--baseline); stroke-width: 1; }
   .chart-tick { fill: var(--text-muted); font-family: var(--font-data); font-size: 10.5px; }
   .chart-endcap { stroke: var(--surface-1); stroke-width: 2; }
@@ -237,19 +324,12 @@
 
   .chart-wrap { position: relative; }
 
-  /* ---------- small multiples ---------- */
-  .sm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
-  .sm-card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px 10px; }
-  .sm-title { font-size: 12px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .sm-now { font-family: var(--font-display); font-size: 20px; font-weight: 560; margin-top: 2px; }
-  .sm-unit { font-size: 11px; color: var(--text-muted); }
-  .sm-spark { margin-top: 8px; height: 34px; }
-
   /* ---------- bar chart ---------- */
-  .bar-row { display: grid; grid-template-columns: 108px 1fr 44px; align-items: center; gap: 10px; padding: 6px 0; }
+  .bar-row { display: grid; grid-template-columns: 108px 1fr 44px; align-items: center; gap: 10px; padding: 6px 0; border-radius: 6px; transition: background 0.15s; }
+  .bar-row.is-selected { background: var(--hue-gold-dim); }
   .bar-label { font-size: 12px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .bar-track { height: 10px; background: var(--surface-2); border-radius: 999px; overflow: hidden; }
-  .bar-fill { height: 100%; border-radius: 999px; background: var(--hue-blue); }
+  .bar-fill { height: 100%; border-radius: 999px; background: var(--status-crit); }
   .bar-value { font-size: 12px; color: var(--text-muted); text-align: right; font-variant-numeric: tabular-nums; }
 
   /* ---------- empty state ---------- */
@@ -258,6 +338,50 @@
 
   .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
   @media (max-width: 780px) { .grid-2 { grid-template-columns: 1fr; } }
+
+  /* ---------- map ---------- */
+  .map-card { padding: 0; overflow: hidden; }
+  .cat-tabs { display: flex; gap: 1px; background: var(--border); border-bottom: 1px solid var(--border); }
+  .cat-tab {
+    flex: 1; padding: 13px 10px; border: none; background: var(--surface-1); color: var(--text-muted);
+    font-family: var(--font-data); font-size: 12px; letter-spacing: 0.03em; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; gap: 2px; transition: color 0.15s, background 0.15s;
+  }
+  .cat-tab .ct-label { font-weight: 600; color: var(--text-secondary); }
+  .cat-tab .ct-sub { font-size: 10.5px; color: var(--text-muted); }
+  .cat-tab:hover { background: var(--surface-2); }
+  .cat-tab.active { background: var(--surface-2); }
+  .cat-tab.active .ct-label { color: var(--hue-gold); }
+
+  .map-viz { position: relative; width: 100%; max-width: 760px; margin: 0 auto; aspect-ratio: 1800 / 1606; background: #05060a; }
+  .map-viz img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .map-markers { position: absolute; inset: 0; }
+  .map-marker { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 3px; transition: opacity 0.15s, transform 0.15s; }
+  .map-marker.is-dim { opacity: 0.22; }
+  .map-marker.is-selected .marker-dot { box-shadow: 0 0 0 3px var(--hue-gold), 0 0 0 6px rgba(237,161,0,0.25); }
+  .marker-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; box-shadow: 0 0 0 2px rgba(6,6,9,0.65); }
+  .marker-dot.is-national { width: 13px; height: 13px; box-shadow: 0 0 0 2px rgba(6,6,9,0.65), 0 0 0 4px var(--hue-gold); }
+  .marker-chip {
+    background: rgba(8,8,11,0.78); border: 1px solid var(--border-strong); border-radius: 6px;
+    padding: 2px 6px; font-size: 10px; line-height: 1.3; white-space: nowrap; color: var(--text-primary);
+  }
+  .marker-chip.is-national { padding: 3px 8px; font-size: 10.5px; }
+  .marker-chip .mc-name { font-weight: 600; margin-right: 5px; }
+  .marker-chip .mc-val { color: var(--text-secondary); font-weight: 600; }
+  .marker-chip.is-national .mc-val { color: var(--hue-gold); }
+  .map-empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; }
+
+  .map-legend { display: flex; align-items: center; gap: 8px; padding: 10px 16px; font-size: 11px; color: var(--text-muted); border-top: 1px solid var(--border); }
+  .map-legend .swatch { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+  .map-legend .scale { flex: 1; height: 6px; border-radius: 999px; max-width: 160px; }
+  .map-coverage-note { padding: 10px 16px 14px; font-size: 11.5px; color: var(--text-muted); border-top: 1px solid var(--border); }
+  .map-coverage-note b { color: var(--text-secondary); font-weight: 600; }
+
+  /* ---------- media card (reference images) ---------- */
+  .media-card { padding: 0; overflow: hidden; }
+  .media-card img { width: 100%; display: block; }
+  .media-credit { padding: 8px 12px; font-size: 11px; color: var(--text-muted); background: var(--surface-2); }
+  .media-credit a { color: var(--text-secondary); }
 
   footer {
     margin-top: 80px;
@@ -283,107 +407,150 @@
 <body>
 
 <header class="hero">
-  <div class="eyebrow">Eclipse 2026 · A Coruña → Palma · August 12</div>
-  <h1 class="title">Total<br><em>Solar Eclipse</em></h1>
+  <div class="eyebrow">Eclipse 2026 · A Coruña → Palma · 12 de agosto</div>
+  <h1 class="title">Eclipse total<br><em>de Sol</em></h1>
   <p class="subtitle">
-    Live telemetry from five independent public sources along the totality path — solar generation,
-    temperature, road incidents, camera brightness and search interest — polled every 1–20 minutes and
-    republished here as a static snapshot. Built as a data-engineering portfolio project.
-    <a href="https://github.com/anverpy/eclipse2026" target="_blank" rel="noopener">Source on GitHub →</a>
+    Datos en vivo desde España: cinco fuentes públicas independientes a lo largo del camino de totalidad —
+    generación solar, temperatura, incidencias de tráfico, brillo de cámaras e interés de búsqueda.
+    Cobertura limitada a las diez ciudades del camino de totalidad, España peninsular y Palma de Mallorca — no representa el resto del país.
+    Proyecto de portfolio en ingeniería de datos.
+    <a href="https://github.com/anverpy/eclipse2026" target="_blank" rel="noopener">Código en GitHub →</a>
   </p>
   <div class="badge-row">
-    <span class="status-badge" id="status-badge"><span class="status-dot"></span><span id="status-text">Checking…</span></span>
+    <span class="status-badge" id="status-badge"><span class="status-dot"></span><span id="status-text">Comprobando…</span></span>
   </div>
   <div class="countdown" id="countdown" style="display:none">
-    <div class="seg"><div class="n" id="cd-d">–</div><div class="l">Days</div></div>
+    <div class="seg"><div class="n" id="cd-d">–</div><div class="l">Días</div></div>
     <div class="seg"><div class="n" id="cd-h">–</div><div class="l">Hrs</div></div>
     <div class="seg"><div class="n" id="cd-m">–</div><div class="l">Min</div></div>
-    <div class="seg"><div class="n" id="cd-s">–</div><div class="l">Sec</div></div>
+    <div class="seg"><div class="n" id="cd-s">–</div><div class="l">Seg</div></div>
   </div>
-  <div class="refresh-note">Snapshot generated <span class="dt" id="generated-at">—</span> · auto-refreshes every 20s</div>
+  <div class="phase-countdowns" id="phase-countdowns"></div>
+  <div class="refresh-note">Instantánea generada <span class="dt" id="generated-at">—</span></br>La página estará en vivo diez minutos antes del evento.</div>
 </header>
 
 <div class="error-banner" id="error-banner"></div>
 
 <div class="wrap">
 
-  <section>
-    <div class="kpi-row" id="kpi-row"></div>
+  <section style="margin-top:48px">
+    <div class="section-head">
+      <h2>Cómo leer esta página</h2>
+      <div class="section-note">Cinco fuentes públicas independientes, coloreadas de forma consistente en todo el panel.</div>
+    </div>
+    <div class="source-legend">
+      <div class="source-item"><span class="src-dot" style="background:var(--hue-gold)"></span><div><span class="src-logo"><img src="assets/ree-logo.jpg" alt="Logotipo de Red Eléctrica de España"></span><b>⚡ REE <span class="acr">(Red Eléctrica de España)</span></b><span>Generación solar fotovoltaica en tiempo real, España peninsular. Debería caer durante la totalidad.</span></div></div>
+      <div class="source-item"><span class="src-dot" style="background:var(--hue-orange)"></span><div><span class="src-logo"><img src="assets/aemet-logo.png" alt="Logotipo de la Agencia Estatal de Meteorología"></span><b>🌡️ AEMET <span class="acr">(Agencia Estatal de Meteorología)</span></b><span>Temperatura en 10 estaciones a lo largo del camino de totalidad.</span></div></div>
+      <div class="source-item"><span class="src-dot" style="background:var(--status-crit)"></span><div><span class="src-logo"><img src="assets/dgt-logo.svg" alt="Logotipo de la Dirección General de Tráfico"></span><b>🚦 DGT Tráfico <span class="acr">(Dirección General de Tráfico)</span></b><span>Incidencias activas en carretera, vía el Punto de Acceso Nacional (NAP-DGT). No existe dato público de intensidad de tráfico en España.</span></div></div>
+      <div class="source-item"><span class="src-dot" style="background:var(--hue-blue)"></span><div><span class="src-logo"><img src="assets/dgt-logo.svg" alt="Logotipo de la Dirección General de Tráfico"></span><b>☀️ DGT Cámaras <span class="acr">(Dirección General de Tráfico)</span></b><span>Brillo medio de 9 cámaras oficiales de tráfico, vía el Punto de Acceso Nacional (NAP-DGT) — el indicador más directo del oscurecimiento del cielo.</span></div></div>
+      <div class="source-item"><span class="src-dot" style="background:var(--hue-violet)"></span><div><span class="src-logo"><img src="assets/trends-logo.jpg" alt="Logotipo de Google Trends"></span><b>🔍 Google Trends <span class="acr">(herramienta pública de Google)</span></b><span>Interés de búsqueda del término «eclipse» en España, estimado.</span></div></div>
+    </div>
   </section>
 
   <section>
     <div class="section-head">
-      <h2>Sky brightness during totality</h2>
-      <div class="section-note">Mean brightness across 9 official NAP-DGT traffic cameras along the totality path. Watch for the dip during the totality window.</div>
+      <h2>Camino de totalidad</h2>
+      <div class="section-note" id="map-note">Brillo del cielo a lo largo del camino, más generación solar peninsular.</div>
+    </div>
+
+    <div class="filter-bar">
+      <div class="filter-bar-head">Filtros <span>— afectan a todo el panel, no solo al mapa</span></div>
+      <div class="filter-groups">
+        <div class="filter-group">
+          <span class="filter-label">Ventana temporal</span>
+          <div class="chip-row" id="window-chips">
+            <button type="button" class="chip" data-window="all">Todo el día</button>
+            <button type="button" class="chip" data-window="antes">Antes</button>
+            <button type="button" class="chip" data-window="parcial">Parcial</button>
+            <button type="button" class="chip" data-window="totalidad">Totalidad</button>
+            <button type="button" class="chip" data-window="despues">Después</button>
+          </div>
+        </div>
+        <div class="filter-group">
+          <span class="filter-label">Ciudad</span>
+          <div class="chip-row" id="city-chips">
+            <button type="button" class="chip" data-city="all">Todas las ciudades</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card hero-card map-card">
+      <div class="cat-tabs" id="cat-tabs">
+        <button class="cat-tab" data-category="eclipse"><span class="ct-label">🌑 Efecto eclipse</span><span class="ct-sub">brillo + solar</span></button>
+        <button class="cat-tab" data-category="weather"><span class="ct-label">🌡️ Clima</span><span class="ct-sub">temperatura</span></button>
+        <button class="cat-tab" data-category="activity"><span class="ct-label">👥 Actividad humana</span><span class="ct-sub">incidencias en carretera</span></button>
+      </div>
+      <div class="map-viz">
+        <img src="assets/totality-map.jpg" alt="Mapa del camino de totalidad en España con marcadores de datos en vivo">
+        <div class="map-markers" id="map-markers"></div>
+      </div>
+      <div class="map-legend" id="map-legend"></div>
+      <div class="map-coverage-note" id="map-coverage-note" style="display:none"></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>Mapa y tiempos de referencia</h2>
+      <div class="section-note">Mapa oficial de la banda de totalidad, y un ejemplo de cómo progresan las fases parciales (Madrid) — como contexto junto a la vista en vivo de arriba.</div>
+    </div>
+    <div class="grid-2">
+      <div class="card media-card">
+        <img src="assets/totality-map.jpg" alt="Mapa oficial del IGN del camino de totalidad del 12 de agosto de 2026 en la Península Ibérica, con contornos de duración y oscurecimiento">
+        <div class="media-credit">Instituto Geográfico Nacional — <a href="https://astronomia.ign.es/eclipses-de-sol-y-luna/eclipse-total-sol-de-12-de-agosto-2026" target="_blank" rel="noopener">astronomia.ign.es</a></div>
+      </div>
+      <div class="card media-card">
+        <img src="assets/sun-phases.jpg" alt="Progresión de las fases del eclipse parcial visto desde Madrid, de 19:35 a 21:25">
+        <div class="media-credit">Instituto Geográfico Nacional — <a href="https://astronomia.ign.es/eclipses-de-sol-y-luna/eclipse-total-sol-de-12-de-agosto-2026" target="_blank" rel="noopener">astronomia.ign.es</a></div>
+      </div>
+    </div>
+    <div class="section-note" style="margin-top:10px">Fuente: Instituto Geográfico Nacional (IGN), Observatorio Astronómico Nacional — Ministerio de Transportes y Movilidad Sostenible. Imágenes originales: <a href="https://astronomia.ign.es/eclipses-de-sol-y-luna/eclipse-total-sol-de-12-de-agosto-2026" target="_blank" rel="noopener">astronomia.ign.es/eclipses-de-sol-y-luna/eclipse-total-sol-de-12-de-agosto-2026</a>.</div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>Antes, durante y después</h2>
+      <div class="section-note">La comparación clave del proyecto: un patrón de brillo y generación solar que no se repite en el mismo lugar durante décadas. Esta tarjeta ignora el filtro de «Ventana temporal» de arriba a propósito, para mostrar siempre las cuatro fases lado a lado.</div>
     </div>
     <div class="card hero-card">
-      <div class="card-title-row">
-        <div><div class="card-title">Mean camera brightness</div><div class="card-sub">0–255, averaged per minute across all cameras</div></div>
-        <div class="card-now" id="hero-now">—</div>
-      </div>
-      <div class="chart-wrap" id="hero-chart"></div>
+      <div class="phase-compare" id="phase-compare"></div>
+      <div class="phase-legend">Horario oficial (IGN, España peninsular): Antes — antes de las 19:30h (17:30 UTC), inicio de la fase parcial. Parcial — fases parciales antes y después de la totalidad, hasta ≈21:25h (19:25 UTC) según la referencia de Madrid del IGN. Totalidad — 20:27–20:35h (18:27–18:35 UTC), duración real 1–1,7 min según el punto del camino. Después — tras el último contacto parcial. Mismo horario para el simulacro del 11 de agosto y el evento del 12.</div>
+      <div class="phase-metric-title" style="margin-top:26px">Recuento de lecturas por fase <span style="font-weight:400;color:var(--text-muted)">— por fuente, para comprobar que la ingesta cubre las cuatro fases</span></div>
+      <div class="phase-counts" id="phase-counts"></div>
     </div>
   </section>
 
   <section>
     <div class="section-head">
-      <h2>Photovoltaic generation</h2>
-      <div class="section-note">REE ESIOS indicator 1295 — real-time solar PV output, mainland Spain. Expect a matching dip during totality.</div>
+      <h2>Todas las fuentes en el tiempo</h2>
+      <div class="section-note">Las cinco fuentes en una sola visualización, gobernada por los filtros de «Ventana temporal» y «Ciudad» de arriba. Cada serie está normalizada a una escala relativa 0–100 para comparar su forma en el mismo eje temporal; los valores reales están en la leyenda y al pasar el cursor.</div>
     </div>
-    <div class="card">
-      <div class="card-title-row">
-        <div><div class="card-title">Generación fotovoltaica · Península</div><div class="card-sub">MW, ~5 min resolution</div></div>
-        <div class="card-now" id="ree-now">—</div>
-      </div>
-      <div class="chart-wrap" id="ree-chart"></div>
+    <div class="card hero-card">
+      <div class="combo-legend" id="combo-legend"></div>
+      <div class="chart-wrap" id="combo-chart"></div>
     </div>
-  </section>
-
-  <section>
-    <div class="section-head">
-      <h2>Temperature along the path</h2>
-      <div class="section-note">AEMET OpenData, 10 curated stations, one per totality-path city.</div>
-    </div>
-    <div class="sm-grid" id="aemet-grid"></div>
-  </section>
-
-  <section>
-    <div class="grid-2">
-      <div>
-        <div class="section-head"><h2>Search interest</h2></div>
-        <div class="card">
-          <div class="card-title-row">
-            <div><div class="card-title">Google Trends · "eclipse" (ES)</div><div class="card-sub">Index 0–100, best-effort</div></div>
-            <div class="card-now" id="trends-now">—</div>
-          </div>
-          <div class="chart-wrap" id="trends-chart"></div>
+    <div class="grid-2" style="margin-top:20px">
+      <div class="card">
+        <div class="card-title-row">
+          <div><div class="card-title">Por ciudad</div><div class="card-sub">Temperatura y brillo de cámara, última lectura</div></div>
         </div>
+        <div id="city-table"></div>
       </div>
-      <div>
-        <div class="section-head"><h2>Active road incidents</h2></div>
-        <div class="card" id="dgt-bar-card">
-          <div class="card-title-row">
-            <div><div class="card-title">NAP-DGT · by province</div><div class="card-sub">Incident records today</div></div>
-            <div class="card-now" id="dgt-total">—</div>
-          </div>
-          <div id="dgt-bars"></div>
+      <div class="card" id="dgt-bar-card">
+        <div class="card-title-row">
+          <div><div class="card-title">NAP-DGT · por provincia</div><div class="card-sub">Incidencias en esta selección</div></div>
+          <div class="card-now" id="dgt-total">—</div>
         </div>
+        <div id="dgt-bars"></div>
       </div>
     </div>
-  </section>
-
-  <section>
-    <div class="section-head">
-      <h2>Traffic cameras</h2>
-      <div class="section-note">9 official NAP-DGT cameras, one per totality-path province — mean brightness per frame.</div>
-    </div>
-    <div class="sm-grid" id="camera-grid"></div>
   </section>
 
   <footer>
     <div class="sources">
-      Sources: REE ESIOS · AEMET OpenData · NAP-DGT (traffic + cameras) · Google Trends.
-      Data served from this project's own S3 bucket, never proxied live from source APIs.
+      Fuentes: REE ESIOS · AEMET OpenData · NAP-DGT (tráfico + cámaras) · Google Trends.
+      Los datos se sirven desde el bucket S3 propio de este proyecto, nunca mediante llamadas directas a las APIs originales.
     </div>
     <div><a href="https://github.com/anverpy/eclipse2026" target="_blank" rel="noopener">GitHub</a></div>
   </footer>
@@ -391,11 +558,9 @@
 
 <div class="tooltip" id="tooltip"></div>
 
+<script src="snapshot-data.js"></script>
 <script>
 "use strict";
-
-const DATA_URL = "https://eclipse2026-public.s3.eu-west-1.amazonaws.com/latest.json";
-const REFRESH_MS = 20000;
 
 const WINDOWS = {
   dryrunStart: new Date("2026-08-11T16:30:00Z"),
@@ -411,16 +576,107 @@ const tooltip = document.getElementById("tooltip");
 function fmtNum(v, digits) {
   if (v === null || v === undefined || Number.isNaN(v)) return "—";
   if (digits === undefined) digits = Math.abs(v) < 10 ? 1 : 0;
-  return v.toLocaleString("en-US", { maximumFractionDigits: digits, minimumFractionDigits: 0 });
+  return v.toLocaleString("es-ES", { maximumFractionDigits: digits, minimumFractionDigits: 0 });
 }
 function fmtTime(d) {
-  return d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" }) + " UTC";
+  return d.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" }) + " UTC";
 }
 function fmtClock(d) {
-  return d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: "UTC" });
+  return d.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: "UTC" });
 }
 function parseTs(rec) { return new Date(rec.ts_utc); }
 function cssVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+/* ---------------- totality path + static map projection ----------------
+   The hero map reuses assets/totality-map.jpg (the official IGN map, already
+   showing the totality band) as a static background image instead of a 3D
+   globe — simpler, more robust (no WebGL/layout race), and this project only
+   ever covers Spain, so a flat map loses nothing. Live data is overlaid as
+   small always-visible chips (no hover needed) positioned with geoToPct(),
+   an affine lat/lng -> image-percent fit calibrated against the 10 path-city
+   dot positions read off that image on a 100px pixel grid. */
+const TOTALITY_PATH = [
+  { name: "A Coruña", lat: 43.3623, lng: -8.4115 },
+  { name: "Lugo", lat: 43.0121, lng: -7.5560 },
+  { name: "Asturias", lat: 43.3603, lng: -5.8448 },
+  { name: "León", lat: 42.5987, lng: -5.5671 },
+  { name: "Burgos", lat: 42.3439, lng: -3.6969 },
+  { name: "Soria", lat: 41.7636, lng: -2.4649 },
+  { name: "Zaragoza", lat: 41.6488, lng: -0.8891 },
+  { name: "Teruel", lat: 40.3456, lng: -1.1065 },
+  { name: "Castellón", lat: 39.9864, lng: -0.0513 },
+  { name: "Palma", lat: 39.5696, lng: 2.6502 },
+];
+
+function geoToPct(lat, lng) {
+  const x = 6.51173 * lng - 0.05773 * lat + 72.4612;
+  const y = -0.05250 * lng - 10.41868 * lat + 465.8387;
+  return { x: Math.max(1, Math.min(99, x)), y: Math.max(1, Math.min(99, y)) };
+}
+function nearestPathCity(lat, lon) {
+  if (lat == null || lon == null) return null;
+  let best = null, bestD = Infinity;
+  TOTALITY_PATH.forEach(c => {
+    const d = (c.lat - lat) ** 2 + (c.lng - lon) ** 2;
+    if (d < bestD) { bestD = d; best = c.name; }
+  });
+  return best;
+}
+const GLOBE_REF = { lat: 40.4, lng: -3.7 }; // reference point (Madrid area, REE's own coords) for national-only badges
+
+function latestByStation(records) {
+  const m = new Map();
+  records.forEach(r => {
+    const cur = m.get(r.station_or_camera_id);
+    if (!cur || new Date(r.ts_utc) > new Date(cur.ts_utc)) m.set(r.station_or_camera_id, r);
+  });
+  return m;
+}
+
+/* ---------------- filters ----------------
+   Four dimensions (fuente / ventana temporal / ciudad / categoría) drive one
+   shared render() pass — every section on the page (map, KPIs, charts, small
+   multiples) reflects the same filter state, so nothing looks inconsistent. */
+const FILTERS = {
+  category: "eclipse",
+  sources: new Set(["ree", "aemet", "dgt_traffic", "dgt_camera", "trends"]),
+  window: "all",
+  cities: new Set(), // empty = all cities; unlike "Ventana temporal", this filter is multi-select
+};
+
+// Official timing (IGN + project plan, all Spain-peninsula local clock times converted
+// to UTC): partial phase begins ~19:30 (17:30 UTC); totality 20:27-20:35 (18:27-18:35
+// UTC, real duration 1-1.7 min depending on the point along the path); partial phase
+// ends ~21:25 (19:25 UTC) at the IGN's Madrid reference. Same clock times for the Aug 11
+// dry run and the Aug 12 event.
+function eclipsePhases(dt) {
+  return {
+    partialStart: new Date(dt + "T17:30:00Z"),
+    totalityStart: new Date(dt + "T18:27:00Z"),
+    totalityEnd: new Date(dt + "T18:35:00Z"),
+    partialEnd: new Date(dt + "T19:25:00Z"),
+  };
+}
+function classifyPhase(tsUtc, ph) {
+  const t = new Date(tsUtc);
+  if (t < ph.partialStart) return "antes";
+  if (t < ph.totalityStart) return "parcial";
+  if (t <= ph.totalityEnd) return "totalidad";
+  if (t <= ph.partialEnd) return "parcial";
+  return "despues";
+}
+function inTimeWindow(tsUtc, ph) {
+  if (FILTERS.window === "all") return true;
+  return classifyPhase(tsUtc, ph) === FILTERS.window;
+}
+function filterRecords(records, sourceKey, ph) {
+  if (!FILTERS.sources.has(sourceKey)) return [];
+  return records.filter(r => inTimeWindow(r.ts_utc, ph));
+}
+function byCity(records) {
+  if (FILTERS.cities.size === 0) return records;
+  return records.filter(r => FILTERS.cities.has(nearestPathCity(r.lat, r.lon)));
+}
 
 /* ---------------- status badge + countdown ---------------- */
 function updateStatus() {
@@ -430,21 +686,21 @@ function updateStatus() {
   const cd = document.getElementById("countdown");
   badge.classList.remove("is-live", "is-totality");
 
-  let label, target = null, cdLabel = "";
+  let label, target = null;
 
   if (now >= WINDOWS.totalityStart && now <= WINDOWS.totalityEnd) {
-    label = "LIVE — TOTALITY NOW"; badge.classList.add("is-live", "is-totality");
+    label = "EN VIVO — TOTALIDAD AHORA"; badge.classList.add("is-live", "is-totality");
   } else if (now >= WINDOWS.eventStart && now <= WINDOWS.eventEnd) {
-    label = "LIVE — EVENT DAY"; badge.classList.add("is-live");
-    target = WINDOWS.totalityStart; cdLabel = "until totality";
+    label = "EN VIVO — DÍA DEL EVENTO"; badge.classList.add("is-live");
+    target = WINDOWS.totalityStart;
   } else if (now >= WINDOWS.dryrunStart && now <= WINDOWS.dryrunEnd) {
-    label = "LIVE — DRY RUN (Aug 11 rehearsal)"; badge.classList.add("is-live");
+    label = "EN VIVO — SIMULACRO (ensayo 11 de agosto)"; badge.classList.add("is-live");
   } else if (now < WINDOWS.dryrunStart) {
-    label = "Upcoming"; target = WINDOWS.totalityStart; cdLabel = "until totality";
+    label = "Próximamente"; target = WINDOWS.totalityStart;
   } else if (now > WINDOWS.dryrunEnd && now < WINDOWS.eventStart) {
-    label = "Dry run complete · event tomorrow"; target = WINDOWS.eventStart; cdLabel = "until event window";
+    label = "Simulacro completado · evento mañana"; target = WINDOWS.eventStart;
   } else {
-    label = "Event ended";
+    label = "Evento finalizado";
   }
   text.textContent = label;
 
@@ -459,7 +715,6 @@ function updateStatus() {
     document.getElementById("cd-m").textContent = String(m).padStart(2, "0");
     document.getElementById("cd-s").textContent = String(s).padStart(2, "0");
     cd.style.display = "inline-flex";
-    cd.querySelectorAll(".l")[0].nextSibling; // no-op, keep labels static
   } else {
     cd.style.display = "none";
   }
@@ -467,147 +722,67 @@ function updateStatus() {
 setInterval(updateStatus, 1000);
 updateStatus();
 
+/* ---------------- per-phase countdown tiles ----------------
+   Four live countdowns (Antes / Parcial / Totalidad / Después) against the
+   real Aug 12 event clock — same reference times as the header's single
+   countdown above, just broken out per phase. "Parcial" happens twice
+   (before and after totality); its tile counts down to whichever boundary
+   is next rather than trying to show both sub-windows separately. */
+const REAL_EVENT_PHASES = eclipsePhases("2026-08-12");
+const PHASE_ORDER = ["antes", "parcial", "totalidad", "despues"];
+const PHASE_LABELS = { antes: "Antes", parcial: "Parcial", totalidad: "Totalidad", despues: "Después" };
+
+function fmtCountdown(ms) {
+  const totalSec = Math.floor(Math.max(0, ms) / 1000);
+  const d = Math.floor(totalSec / 86400);
+  const h = Math.floor((totalSec % 86400) / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  const hh = String(h).padStart(2, "0"), mm = String(m).padStart(2, "0"), ss = String(s).padStart(2, "0");
+  return d > 0 ? `${d}d ${hh}:${mm}:${ss}` : `${hh}:${mm}:${ss}`;
+}
+
+function phaseBoundsNow(now) {
+  const ph = REAL_EVENT_PHASES;
+  return {
+    antes:     { start: null, end: ph.partialStart },
+    parcial:   { start: ph.partialStart, end: now < ph.totalityStart ? ph.totalityStart : ph.partialEnd },
+    totalidad: { start: ph.totalityStart, end: ph.totalityEnd },
+    despues:   { start: ph.partialEnd, end: null },
+  };
+}
+
+function updatePhaseCountdowns() {
+  const el = document.getElementById("phase-countdowns");
+  if (!el) return;
+  const now = new Date();
+  const currentKey = classifyPhase(now, REAL_EVENT_PHASES);
+  const currentIdx = PHASE_ORDER.indexOf(currentKey);
+  const bounds = phaseBoundsNow(now);
+  el.innerHTML = PHASE_ORDER.map((key, i) => {
+    const b = bounds[key];
+    let cls = "", time, status;
+    if (i < currentIdx) {
+      cls = "is-done"; time = "—"; status = "Completado";
+    } else if (i === currentIdx) {
+      cls = "is-active";
+      if (b.end) { time = fmtCountdown(b.end - now); status = "Termina en"; }
+      else { time = "En curso"; status = "Evento finalizado"; }
+    } else {
+      time = fmtCountdown(b.start - now); status = "Comienza en";
+    }
+    return `<div class="pcd-cell ${cls}"><div class="pcd-label">${PHASE_LABELS[key]}</div><div class="pcd-time">${time}</div><div class="pcd-status">${status}</div></div>`;
+  }).join("");
+}
+setInterval(updatePhaseCountdowns, 1000);
+updatePhaseCountdowns();
+
 /* ---------------- generic SVG line chart ---------------- */
 const NS = "http://www.w3.org/2000/svg";
 function svgEl(tag, attrs) {
   const el = document.createElementNS(NS, tag);
   for (const k in attrs) el.setAttribute(k, attrs[k]);
   return el;
-}
-
-function renderLineChart(container, series, opts) {
-  opts = opts || {};
-  container.innerHTML = "";
-  if (!series.length) {
-    container.innerHTML = '<div class="empty-state"><span class="glyph">○</span>No data in this window yet.</div>';
-    return;
-  }
-  const W = 880, H = opts.height || 220, padL = 44, padR = 14, padT = 14, padB = 26;
-  const plotW = W - padL - padR, plotH = H - padT - padB;
-
-  const xs = series.map(p => p.x.getTime());
-  const ys = series.map(p => p.y);
-  const xMin = Math.min(...xs), xMax = Math.max(...xs);
-  let yMin = Math.min(...ys), yMax = Math.max(...ys);
-  if (yMin === yMax) { yMin -= 1; yMax += 1; }
-  const pad = (yMax - yMin) * 0.12;
-  yMin -= pad; yMax += pad;
-
-  const xScale = t => padL + (xMax === xMin ? plotW / 2 : ((t - xMin) / (xMax - xMin)) * plotW);
-  const yScale = v => padT + plotH - ((v - yMin) / (yMax - yMin)) * plotH;
-
-  const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, class: "chart-svg", preserveAspectRatio: "none" });
-  svg.style.width = "100%"; svg.style.height = (opts.pxHeight || 240) + "px";
-
-  // totality / dry-run band annotation
-  if (opts.band) {
-    const bx1 = xScale(opts.band.start.getTime());
-    const bx2 = xScale(opts.band.end.getTime());
-    if (bx2 > padL && bx1 < W - padR) {
-      const rx1 = Math.max(padL, bx1), rx2 = Math.min(W - padR, bx2);
-      svg.appendChild(svgEl("rect", { x: rx1, y: padT, width: Math.max(1, rx2 - rx1), height: plotH, fill: "var(--hue-gold-dim)", class: "chart-band" }));
-      const lbl = svgEl("text", { x: rx1 + 4, y: padT + 12, class: "chart-band-label" });
-      lbl.textContent = opts.band.label || "Totality";
-      svg.appendChild(lbl);
-    }
-  }
-
-  // gridlines (3 horizontal)
-  const gridSteps = 3;
-  for (let i = 0; i <= gridSteps; i++) {
-    const v = yMin + ((yMax - yMin) * i) / gridSteps;
-    const y = yScale(v);
-    svg.appendChild(svgEl("line", { x1: padL, x2: W - padR, y1: y, y2: y, class: "chart-grid" }));
-    const t = svgEl("text", { x: 6, y: y + 3, class: "chart-tick" });
-    t.textContent = fmtNum(v);
-    svg.appendChild(t);
-  }
-  // baseline
-  svg.appendChild(svgEl("line", { x1: padL, x2: W - padR, y1: padT + plotH, y2: padT + plotH, class: "chart-baseline" }));
-
-  // x ticks: first, middle, last
-  [0, Math.floor(series.length / 2), series.length - 1].forEach((idx, i) => {
-    const p = series[idx];
-    const x = xScale(p.x.getTime());
-    const t = svgEl("text", { x, y: H - 6, class: "chart-tick", "text-anchor": i === 0 ? "start" : (i === 2 ? "end" : "middle") });
-    t.textContent = fmtTime(p.x);
-    svg.appendChild(t);
-  });
-
-  // area fill
-  const color = opts.color || "var(--hue-blue)";
-  let areaD = `M ${xScale(xs[0])} ${padT + plotH} `;
-  series.forEach(p => areaD += `L ${xScale(p.x.getTime())} ${yScale(p.y)} `);
-  areaD += `L ${xScale(xs[xs.length - 1])} ${padT + plotH} Z`;
-  svg.appendChild(svgEl("path", { d: areaD, fill: color, class: "chart-area" }));
-
-  // line
-  let lineD = "";
-  series.forEach((p, i) => { lineD += (i === 0 ? "M " : "L ") + xScale(p.x.getTime()) + " " + yScale(p.y) + " "; });
-  svg.appendChild(svgEl("path", { d: lineD, stroke: color, class: "chart-line" }));
-
-  // end dot
-  const last = series[series.length - 1];
-  svg.appendChild(svgEl("circle", { cx: xScale(xs[xs.length - 1]), cy: yScale(last.y), r: 4.5, fill: color, class: "chart-endcap" }));
-
-  // crosshair
-  const chLine = svgEl("line", { class: "crosshair-line", y1: padT, y2: padT + plotH, style: "opacity:0" });
-  const chDot = svgEl("circle", { r: 4.5, fill: color, class: "crosshair-dot", style: "opacity:0" });
-  svg.appendChild(chLine); svg.appendChild(chDot);
-
-  const overlay = svgEl("rect", { x: padL, y: padT, width: plotW, height: plotH, fill: "transparent" });
-  svg.appendChild(overlay);
-
-  const wrap = document.createElement("div");
-  wrap.className = "chart-wrap";
-  wrap.appendChild(svg);
-  container.appendChild(wrap);
-
-  function nearestIndex(mx) {
-    let best = 0, bestD = Infinity;
-    for (let i = 0; i < series.length; i++) {
-      const d = Math.abs(xScale(xs[i]) - mx);
-      if (d < bestD) { bestD = d; best = i; }
-    }
-    return best;
-  }
-
-  overlay.addEventListener("pointermove", e => {
-    const rect = svg.getBoundingClientRect();
-    const mx = ((e.clientX - rect.left) / rect.width) * W;
-    const idx = nearestIndex(mx);
-    const p = series[idx];
-    const px = xScale(xs[idx]), py = yScale(p.y);
-    chLine.setAttribute("x1", px); chLine.setAttribute("x2", px);
-    chLine.style.opacity = 1;
-    chDot.setAttribute("cx", px); chDot.setAttribute("cy", py);
-    chDot.style.opacity = 1;
-
-    tooltip.innerHTML = `<div class="tt-t">${fmtClock(p.x)} UTC</div><div class="tt-v">${fmtNum(p.y, opts.digits)} ${opts.unit || ""}</div>${p.extra ? `<div class="tt-t">${p.extra}</div>` : ""}`;
-    tooltip.classList.add("show");
-    tooltip.style.left = (e.clientX + 14) + "px";
-    tooltip.style.top = (e.clientY + 14) + "px";
-  });
-  overlay.addEventListener("pointerleave", () => {
-    chLine.style.opacity = 0; chDot.style.opacity = 0; tooltip.classList.remove("show");
-  });
-}
-
-function renderSpark(container, series, color) {
-  container.innerHTML = "";
-  if (series.length < 2) { return; }
-  const W = 240, H = 60;
-  const xs = series.map(p => p.x.getTime());
-  const ys = series.map(p => p.y);
-  let yMin = Math.min(...ys), yMax = Math.max(...ys);
-  if (yMin === yMax) { yMin -= 1; yMax += 1; }
-  const xScale = t => ((t - xs[0]) / (xs[xs.length - 1] - xs[0] || 1)) * W;
-  const yScale = v => H - 4 - ((v - yMin) / (yMax - yMin)) * (H - 8);
-  const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, class: "chart-svg", preserveAspectRatio: "none" });
-  let d = "";
-  series.forEach((p, i) => { d += (i === 0 ? "M " : "L ") + xScale(p.x.getTime()) + " " + yScale(p.y) + " "; });
-  svg.appendChild(svgEl("path", { d, stroke: color, class: "chart-line", "stroke-width": 1.75 }));
-  container.appendChild(svg);
 }
 
 /* ---------------- data shaping helpers ---------------- */
@@ -637,155 +812,516 @@ function groupBy(records, key) {
   return m;
 }
 
-/* ---------------- KPI tiles ---------------- */
-function kpiTile(label, valueStr, unit, sparkSeries, color, deltaStr, deltaDir) {
-  const el = document.createElement("div");
-  el.className = "kpi-tile";
-  el.innerHTML = `
-    <div class="kpi-label">${label}</div>
-    <div>
-      <div class="kpi-value-row"><span class="kpi-value">${valueStr}</span><span class="kpi-unit">${unit || ""}</span></div>
-      ${deltaStr ? `<div class="kpi-delta ${deltaDir}">${deltaStr}</div>` : ""}
-    </div>
-    <div class="kpi-spark"></div>
-  `;
-  if (sparkSeries && sparkSeries.length >= 2) {
-    renderSpark(el.querySelector(".kpi-spark"), sparkSeries, color);
+/* ---------------- map (static totality-path image + live marker overlay) ----------------
+   Flat, minimal markers: magnitude reads through color only, not extrusion —
+   easier to compare than the old 3D cylinder points, and legible without
+   hovering. Three switchable categories instead of five raw on/off toggles;
+   the "Efecto eclipse" view pairs camera brightness (per city) with REE's
+   national solar-generation figure as a fixed badge — its only source with no
+   coordinates of its own worth surfacing here. Trends is national-only too,
+   but isn't plotted on the map: it has no real location, and its value is
+   already shown in the combined chart/legend further down. City markers are
+   dimmed (not hidden) when the "Ciudad" filter narrows to one, so the full
+   path stays visible for spatial context. */
+function hexToRgb(hex) {
+  const h = hex.replace("#", "");
+  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+}
+function lerpColor(a, b, t) {
+  const [ar, ag, ab] = hexToRgb(a), [br, bg, bb] = hexToRgb(b);
+  return `rgb(${Math.round(ar + (br - ar) * t)}, ${Math.round(ag + (bg - ag) * t)}, ${Math.round(ab + (bb - ab) * t)})`;
+}
+function norm(v, lo, hi) { return Math.max(0, Math.min(1, (v - lo) / (hi - lo || 1))); }
+
+const MAP_VIEWS = {
+  eclipse: {
+    note: "Brillo del cielo a lo largo del camino, más generación solar peninsular.",
+    legend: { label: "Oscuro → brillante", from: "#0a0a14", to: "#eda100" },
+    build() {
+      const markers = [];
+      if (FILTERS.sources.has("dgt_camera")) {
+        latestByStation(lastSources.dgt_camera).forEach(r => {
+          if (r.lat == null || r.lon == null) return;
+          const t = norm(r.value, 0, 255);
+          markers.push({ lat: r.lat, lon: r.lon, value: `${fmtNum(r.value)}/255`, color: lerpColor("#0a0a14", "#eda100", t), city: nearestPathCity(r.lat, r.lon) });
+        });
+      }
+      if (FILTERS.sources.has("ree")) {
+        const last = toSeries(lastSources.ree).slice(-1)[0];
+        if (last) markers.push({ lat: GLOBE_REF.lat, lon: GLOBE_REF.lng, name: "Península (solar)", value: `${fmtNum(last.y)} MW`, color: cssVar("--hue-gold") || "#eda100", national: true });
+      }
+      return markers;
+    },
+  },
+  weather: {
+    note: "Temperatura de las estaciones AEMET a lo largo del camino.",
+    legend: { label: "Frío → cálido", from: "#3987e5", to: "#d95926" },
+    build() {
+      if (!FILTERS.sources.has("aemet")) return [];
+      const latest = latestByStation(lastSources.aemet);
+      const vals = [...latest.values()].map(r => r.value);
+      const lo = vals.length ? Math.min(...vals) : 15, hi = vals.length ? Math.max(...vals) : 35;
+      const markers = [];
+      latest.forEach(r => {
+        if (r.lat == null || r.lon == null) return;
+        markers.push({ lat: r.lat, lon: r.lon, value: `${fmtNum(r.value)}°C`, color: lerpColor("#3987e5", "#d95926", norm(r.value, lo, hi)), city: nearestPathCity(r.lat, r.lon) });
+      });
+      return markers;
+    },
+  },
+  activity: {
+    note: "Incidencias activas en carretera a lo largo del camino de totalidad.",
+    legend: { swatch: "#e66767", label: "Ubicación de incidencia" },
+    build() {
+      const markers = [];
+      if (FILTERS.sources.has("dgt_traffic")) {
+        latestByStation(lastSources.dgt_traffic).forEach(r => {
+          if (r.lat == null || r.lon == null) return;
+          markers.push({ lat: r.lat, lon: r.lon, value: "incidencia", color: "rgba(230,103,103,0.9)", city: nearestPathCity(r.lat, r.lon) });
+        });
+      }
+      return markers;
+    },
+  },
+};
+
+let lastSources = null;
+
+function renderMapLegend(view) {
+  const el = document.getElementById("map-legend");
+  if (!el) return;
+  el.innerHTML = view.legend.swatch
+    ? `<span class="swatch" style="background:${view.legend.swatch}"></span><span>${view.legend.label}</span>`
+    : `<span>${view.legend.label}</span><span class="scale" style="background:linear-gradient(90deg, ${view.legend.from}, ${view.legend.to})"></span>`;
+}
+
+/* Flags selected cities that have no marker at all in the current category
+   (e.g. Palma has no DGT camera — only 9 mainland provinces have one — so
+   "Efecto eclipse" never places a dot there), so an empty spot on the map
+   reads as a known coverage gap instead of looking broken. */
+function renderMapCoverageNote(markers) {
+  const el = document.getElementById("map-coverage-note");
+  if (!el) return;
+  if (FILTERS.cities.size === 0) { el.style.display = "none"; return; }
+  const covered = new Set(markers.filter(m => !m.national && m.city).map(m => m.city));
+  const missing = [...FILTERS.cities].filter(c => !covered.has(c));
+  if (!missing.length) { el.style.display = "none"; return; }
+  el.style.display = "block";
+  el.innerHTML = `Sin datos de esta categoría en <b>${missing.join(", ")}</b> — es posible que esta fuente no tenga cobertura ahí.`;
+}
+
+function renderMap() {
+  const wrap = document.getElementById("map-markers");
+  if (!wrap || !lastSources) return;
+  const view = MAP_VIEWS[FILTERS.category];
+  const markers = view.build();
+  wrap.innerHTML = "";
+  if (!markers.length) {
+    wrap.innerHTML = '<div class="empty-state map-empty"><span class="glyph">○</span>Sin datos para esta combinación de filtros.</div>';
   } else {
-    el.querySelector(".kpi-spark").innerHTML = '<span class="kpi-empty">not enough data yet</span>';
+    markers.forEach(m => {
+      const pos = geoToPct(m.lat, m.lon);
+      const dim = FILTERS.cities.size > 0 && !m.national && !FILTERS.cities.has(m.city);
+      const selected = !m.national && m.city && FILTERS.cities.has(m.city);
+      const el = document.createElement("div");
+      el.className = "map-marker" + (dim ? " is-dim" : "") + (selected ? " is-selected" : "");
+      el.style.left = pos.x + "%"; el.style.top = pos.y + "%";
+      el.innerHTML = m.national
+        ? `<span class="marker-dot is-national" style="background:${m.color}"></span><span class="marker-chip is-national"><span class="mc-name">${m.name}</span><span class="mc-val">${m.value}</span></span>`
+        : `<span class="marker-dot" style="background:${m.color}"></span><span class="marker-chip"><span class="mc-val">${m.value}</span></span>`;
+      if (m.city) {
+        el.style.cursor = "pointer";
+        el.title = m.city;
+        el.addEventListener("click", () => toggleCity(m.city));
+      }
+      wrap.appendChild(el);
+    });
   }
-  return el;
+  renderMapLegend(view);
+  renderMapCoverageNote(markers);
+  const note = document.getElementById("map-note");
+  if (note) note.textContent = view.note;
+  document.querySelectorAll(".cat-tab").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.category === FILTERS.category);
+  });
+}
+
+document.querySelectorAll(".cat-tab").forEach(btn => {
+  btn.addEventListener("click", () => {
+    if (btn.dataset.category === FILTERS.category) return;
+    FILTERS.category = btn.dataset.category;
+    renderMap();
+  });
+});
+
+/* ---------------- filter bar wiring ----------------
+   No "Fuente" chip row anymore: it mapped 1:1 onto individual map
+   categories (e.g. the AEMET chip only ever did anything in the Clima
+   view), which read as broken paired with the category tabs. FILTERS.sources
+   is left permanently "all on" instead — nothing ever removes from that Set
+   below — so the rest of the code (filterRecords, MAP_VIEWS, phase counts)
+   doesn't need to change. */
+document.querySelectorAll("#window-chips .chip").forEach(btn => {
+  if (btn.dataset.window === "all") btn.classList.add("active");
+  btn.addEventListener("click", () => {
+    if (btn.dataset.window === FILTERS.window) return;
+    FILTERS.window = btn.dataset.window;
+    document.querySelectorAll("#window-chips .chip").forEach(b => b.classList.toggle("active", b === btn));
+    render(SNAPSHOT);
+  });
+});
+
+const cityChipsEl = document.getElementById("city-chips");
+TOTALITY_PATH.forEach(c => {
+  const btn = document.createElement("button");
+  btn.type = "button"; btn.className = "chip"; btn.dataset.city = c.name; btn.textContent = c.name;
+  cityChipsEl.appendChild(btn);
+});
+
+/* Ciudad is multi-select (unlike "Ventana temporal", which is mutually
+   exclusive): each city chip toggles independently, "Todas las ciudades"
+   just clears the selection back to the empty-set = show-everything state. */
+function syncCityChips() {
+  const allActive = FILTERS.cities.size === 0;
+  document.querySelectorAll("#city-chips .chip").forEach(b => {
+    b.classList.toggle("active", b.dataset.city === "all" ? allActive : FILTERS.cities.has(b.dataset.city));
+  });
+}
+function toggleCity(city) {
+  if (FILTERS.cities.has(city)) FILTERS.cities.delete(city);
+  else FILTERS.cities.add(city);
+  syncCityChips();
+  render(SNAPSHOT);
+  highlightCity();
+}
+function clearCities() {
+  if (FILTERS.cities.size === 0) return;
+  FILTERS.cities.clear();
+  syncCityChips();
+  render(SNAPSHOT);
+  highlightCity();
+}
+document.querySelectorAll("#city-chips .chip").forEach(btn => {
+  if (btn.dataset.city === "all") {
+    btn.classList.add("active");
+    btn.addEventListener("click", clearCities);
+  } else {
+    btn.addEventListener("click", () => toggleCity(btn.dataset.city));
+  }
+});
+
+function highlightCity() {
+  const cards = document.querySelectorAll("[data-city-card]");
+  cards.forEach(card => {
+    card.classList.toggle("is-selected", FILTERS.cities.has(card.dataset.cityCard));
+  });
+}
+
+/* ---------------- before/during/after phase comparison ----------------
+   Deliberately independent of FILTERS.window: the point of this card is to
+   always show all four phases side by side (still respects fuente/ciudad),
+   since the whole reason this project exists is to capture a pattern that
+   won't repeat at this location for decades. */
+function phaseMeans(records, ph) {
+  const buckets = { antes: [], parcial: [], totalidad: [], despues: [] };
+  records.forEach(r => buckets[classifyPhase(r.ts_utc, ph)].push(r.value));
+  const mean = arr => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
+  return {
+    antes: mean(buckets.antes), parcial: mean(buckets.parcial),
+    totalidad: mean(buckets.totalidad), despues: mean(buckets.despues),
+  };
+}
+function renderPhaseCompareMetric(title, records, ph, unit) {
+  const m = phaseMeans(records, ph);
+  const rows = [
+    ["Antes", m.antes, false],
+    ["Parcial", m.parcial, false],
+    ["Totalidad", m.totalidad, true],
+    ["Después", m.despues, false],
+  ].map(([label, val, isTotality]) => {
+    let deltaStr = "";
+    if (val !== null && m.antes !== null && m.antes !== 0 && (isTotality || label === "Después")) {
+      const pct = ((val - m.antes) / Math.abs(m.antes)) * 100;
+      const dir = pct >= 0 ? "up" : "down";
+      deltaStr = `<div class="pc-delta ${dir}">${pct >= 0 ? "+" : ""}${fmtNum(pct)}% vs. antes</div>`;
+    }
+    return `<div class="phase-cell${isTotality ? " is-totality" : ""}">
+      <div class="pc-label">${label}</div>
+      <div class="pc-val">${val !== null ? fmtNum(val) + unit : "—"}</div>
+      ${deltaStr}
+    </div>`;
+  }).join("");
+  return `<div class="phase-metric"><div class="phase-metric-title">${title}</div><div class="phase-row">${rows}</div></div>`;
+}
+function renderPhaseCompare(snapshot, ph) {
+  const el = document.getElementById("phase-compare");
+  if (!el) return;
+  const camRecords = FILTERS.sources.has("dgt_camera") ? byCity(snapshot.sources.dgt_camera) : [];
+  const reeRecords = FILTERS.sources.has("ree") ? snapshot.sources.ree : [];
+  let html = "";
+  const citySuffix = FILTERS.cities.size === 0 ? "" :
+    ` · ${FILTERS.cities.size <= 3 ? [...FILTERS.cities].join(", ") : FILTERS.cities.size + " ciudades"}`;
+  html += renderPhaseCompareMetric("Brillo medio de cámara" + citySuffix, camRecords, ph, " / 255");
+  html += renderPhaseCompareMetric("Generación solar (REE, Península)", reeRecords, ph, " MW");
+  if (!camRecords.length && !reeRecords.length) {
+    html = '<div class="empty-state"><span class="glyph">○</span>Activa la fuente REE o DGT Cámaras para ver la comparación.</div>';
+  }
+  el.innerHTML = html;
+}
+
+/* ---------------- per-source record counts per phase ----------------
+   A quick ingestion-health check: how many records landed in each of the
+   four phases, per source. Same city/fuente scoping rules as the phase
+   comparison above (national sources — REE, Trends — aren't city-filtered),
+   and same deliberate independence from the "Ventana temporal" filter. */
+const SOURCE_META = [
+  { key: "ree",         label: "REE",         emoji: "⚡", cityScoped: false },
+  { key: "aemet",       label: "AEMET",       emoji: "🌡️", cityScoped: true },
+  { key: "dgt_traffic", label: "DGT Tráfico", emoji: "🚦", cityScoped: true },
+  { key: "dgt_camera",  label: "DGT Cámaras", emoji: "☀️", cityScoped: true },
+  { key: "trends",      label: "Trends",      emoji: "🔍", cityScoped: false },
+];
+function phaseCounts(records, ph) {
+  const c = { antes: 0, parcial: 0, totalidad: 0, despues: 0 };
+  records.forEach(r => c[classifyPhase(r.ts_utc, ph)]++);
+  return c;
+}
+function renderPhaseCounts(snapshot, ph) {
+  const el = document.getElementById("phase-counts");
+  if (!el) return;
+  const active = SOURCE_META.filter(s => FILTERS.sources.has(s.key));
+  if (!active.length) {
+    el.innerHTML = '<div class="empty-state"><span class="glyph">○</span>Activa alguna fuente para ver el recuento.</div>';
+    return;
+  }
+  const cell = n => `<span class="pct-val${n === 0 ? " is-zero" : ""}">${n}</span>`;
+  const rows = active.map(s => {
+    const records = s.cityScoped ? byCity(snapshot.sources[s.key]) : snapshot.sources[s.key];
+    const c = phaseCounts(records, ph);
+    return `<div class="pct-row"><span class="pct-name">${s.emoji} ${s.label}</span>${cell(c.antes)}${cell(c.parcial)}${cell(c.totalidad)}${cell(c.despues)}</div>`;
+  }).join("");
+  el.innerHTML = `<div class="pct-head"><span></span><span>Antes</span><span>Parcial</span><span>Totalidad</span><span>Después</span></div>${rows}`;
+}
+
+/* ---------------- combined multi-source chart ----------------
+   Every metric is independently min-max normalized to 0-100 so wildly
+   different units (MW, °C, 0-255, count, 0-100 index) can share one axis and
+   be compared by shape/timing rather than magnitude. Real values live in the
+   legend above the chart and in the hover tooltip, never just the 0-100 index. */
+function bucketCount(records, bucketMinutes) {
+  const buckets = new Map();
+  records.forEach(r => {
+    const t = new Date(r.ts_utc);
+    const ms = bucketMinutes * 60000;
+    const bucketed = new Date(Math.floor(t.getTime() / ms) * ms);
+    const key = bucketed.getTime();
+    if (!buckets.has(key)) buckets.set(key, { n: 0, x: bucketed });
+    buckets.get(key).n += 1;
+  });
+  return [...buckets.values()].sort((a, b) => a.x - b.x).map(b => ({ x: b.x, y: b.n }));
+}
+
+function renderComboChart(container, series, opts) {
+  opts = opts || {};
+  container.innerHTML = "";
+  const active = series.filter(s => s.points.length >= 2);
+  if (!active.length) {
+    container.innerHTML = '<div class="empty-state"><span class="glyph">○</span>Sin datos en esta selección.</div>';
+    return;
+  }
+  const W = 880, H = opts.height || 300, padL = 10, padR = 10, padT = 14, padB = 26;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+
+  const normed = active.map(s => {
+    const ys = s.points.map(p => p.y);
+    let lo = Math.min(...ys), hi = Math.max(...ys);
+    if (lo === hi) { lo -= 1; hi += 1; }
+    return Object.assign({}, s, { norm: s.points.map(p => ({ x: p.x, y: p.y, n: ((p.y - lo) / (hi - lo)) * 100 })) });
+  });
+
+  const allX = normed.flatMap(s => s.norm.map(p => p.x.getTime()));
+  const xMin = Math.min(...allX), xMax = Math.max(...allX);
+  const xScale = t => padL + (xMax === xMin ? plotW / 2 : ((t - xMin) / (xMax - xMin)) * plotW);
+  const yScale = n => padT + plotH - (n / 100) * plotH;
+
+  const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, class: "chart-svg", preserveAspectRatio: "none" });
+  svg.style.width = "100%"; svg.style.height = (opts.pxHeight || 320) + "px";
+
+  if (opts.band) {
+    const bx1 = xScale(opts.band.start.getTime());
+    const bx2 = xScale(opts.band.end.getTime());
+    if (bx2 > padL && bx1 < W - padR) {
+      const rx1 = Math.max(padL, bx1), rx2 = Math.min(W - padR, bx2);
+      svg.appendChild(svgEl("rect", { x: rx1, y: padT, width: Math.max(1, rx2 - rx1), height: plotH, fill: "var(--hue-gold-dim)", class: "chart-band" }));
+      const lbl = svgEl("text", { x: rx1 + 4, y: padT + 12, class: "chart-band-label" });
+      lbl.textContent = opts.band.label || "Totalidad";
+      svg.appendChild(lbl);
+    }
+  }
+
+  svg.appendChild(svgEl("line", { x1: padL, x2: W - padR, y1: padT + plotH, y2: padT + plotH, class: "chart-baseline" }));
+
+  [xMin, (xMin + xMax) / 2, xMax].forEach((t, i) => {
+    const x = xScale(t);
+    const tick = svgEl("text", { x, y: H - 6, class: "chart-tick", "text-anchor": i === 0 ? "start" : (i === 2 ? "end" : "middle") });
+    tick.textContent = fmtTime(new Date(t));
+    svg.appendChild(tick);
+  });
+
+  normed.forEach(s => {
+    let d = "";
+    s.norm.forEach((p, i) => { d += (i === 0 ? "M " : "L ") + xScale(p.x.getTime()) + " " + yScale(p.n) + " "; });
+    svg.appendChild(svgEl("path", { d, stroke: s.color, class: "chart-line" }));
+    const last = s.norm[s.norm.length - 1];
+    svg.appendChild(svgEl("circle", { cx: xScale(last.x.getTime()), cy: yScale(last.n), r: 4, fill: s.color, class: "chart-endcap" }));
+  });
+
+  const chLine = svgEl("line", { class: "crosshair-line", y1: padT, y2: padT + plotH, style: "opacity:0" });
+  svg.appendChild(chLine);
+  const dots = normed.map(s => {
+    const c = svgEl("circle", { r: 4, fill: s.color, class: "crosshair-dot", style: "opacity:0" });
+    svg.appendChild(c);
+    return c;
+  });
+
+  const overlay = svgEl("rect", { x: padL, y: padT, width: plotW, height: plotH, fill: "transparent" });
+  svg.appendChild(overlay);
+  container.appendChild(svg);
+
+  function nearestIn(pts, targetT) {
+    let best = 0, bestD = Infinity;
+    pts.forEach((p, i) => { const d = Math.abs(p.x.getTime() - targetT); if (d < bestD) { bestD = d; best = i; } });
+    return best;
+  }
+
+  overlay.addEventListener("pointermove", e => {
+    const rect = svg.getBoundingClientRect();
+    const mx = ((e.clientX - rect.left) / rect.width) * W;
+    const targetT = xMin + ((mx - padL) / plotW) * (xMax - xMin);
+    chLine.setAttribute("x1", mx); chLine.setAttribute("x2", mx); chLine.style.opacity = 1;
+    let timeLabel = "";
+    const rows = normed.map((s, i) => {
+      const idx = nearestIn(s.norm, targetT);
+      const p = s.norm[idx];
+      dots[i].setAttribute("cx", xScale(p.x.getTime())); dots[i].setAttribute("cy", yScale(p.n)); dots[i].style.opacity = 1;
+      if (!timeLabel) timeLabel = fmtClock(p.x) + " UTC";
+      return `<div class="tt-v" style="color:${s.color}">${s.label}: ${fmtNum(p.y, s.digits)}${s.unit}</div>`;
+    }).join("");
+    tooltip.innerHTML = `<div class="tt-t">${timeLabel}</div>${rows}`;
+    tooltip.classList.add("show");
+    tooltip.style.left = (e.clientX + 14) + "px";
+    tooltip.style.top = (e.clientY + 14) + "px";
+  });
+  overlay.addEventListener("pointerleave", () => {
+    chLine.style.opacity = 0; dots.forEach(d => d.style.opacity = 0); tooltip.classList.remove("show");
+  });
+}
+
+/* ---------------- city table (temperature + camera brightness, one row per city) ---------------- */
+function renderCityTable(container, aemetRecords, cameraRecords) {
+  const byCityMap = new Map();
+  latestByStation(aemetRecords).forEach(r => {
+    const city = nearestPathCity(r.lat, r.lon);
+    if (!city) return;
+    if (!byCityMap.has(city)) byCityMap.set(city, {});
+    byCityMap.get(city).temp = r.value;
+  });
+  latestByStation(cameraRecords).forEach(r => {
+    const city = nearestPathCity(r.lat, r.lon);
+    if (!city) return;
+    if (!byCityMap.has(city)) byCityMap.set(city, {});
+    byCityMap.get(city).bright = r.value;
+  });
+  const rows = TOTALITY_PATH.filter(c => byCityMap.has(c.name));
+  container.innerHTML = "";
+  if (!rows.length) {
+    container.innerHTML = '<div class="empty-state"><span class="glyph">○</span>Sin datos en esta selección.</div>';
+    return;
+  }
+  const head = document.createElement("div");
+  head.className = "city-table-head";
+  head.innerHTML = "<span>Ciudad</span><span>Temp.</span><span>Brillo</span>";
+  container.appendChild(head);
+  rows.forEach(c => {
+    const d = byCityMap.get(c.name);
+    const row = document.createElement("div");
+    row.className = "city-table-row";
+    row.dataset.cityCard = c.name;
+    row.innerHTML = `<span class="ct-name">${c.name}</span><span class="ct-temp">${d.temp != null ? fmtNum(d.temp) + "°C" : "—"}</span><span class="ct-bright">${d.bright != null ? fmtNum(d.bright) + "/255" : "—"}</span>`;
+    row.addEventListener("click", () => toggleCity(c.name));
+    container.appendChild(row);
+  });
 }
 
 /* ---------------- main render ---------------- */
-function bandFor(dt) {
-  // tight EventBridge window (18:15-18:45 UTC) on whichever day is being shown;
-  // labeled precisely as "Totality" only for the real event date.
-  const start = new Date(dt + "T18:15:00Z");
-  const end = new Date(dt + "T18:45:00Z");
-  const isEventDay = dt === "2026-08-12";
-  return { start, end, label: isEventDay ? "Totality window" : "Totality window (rehearsal timing)" };
-}
-
 function render(snapshot) {
   document.getElementById("generated-at").textContent = fmtClock(new Date(snapshot.generated_at)) + " UTC (" + snapshot.dt + ")";
 
-  const S = snapshot.sources;
-  const band = bandFor(snapshot.dt);
+  const ph = eclipsePhases(snapshot.dt);
+  const band = { start: ph.totalityStart, end: ph.totalityEnd, label: snapshot.dt === "2026-08-12" ? "Totalidad" : "Totalidad (horario de simulacro)" };
+  const S = {
+    ree: filterRecords(snapshot.sources.ree, "ree", ph),
+    aemet: filterRecords(snapshot.sources.aemet, "aemet", ph),
+    dgt_traffic: filterRecords(snapshot.sources.dgt_traffic, "dgt_traffic", ph),
+    dgt_camera: filterRecords(snapshot.sources.dgt_camera, "dgt_camera", ph),
+    trends: filterRecords(snapshot.sources.trends, "trends", ph),
+  };
+  lastSources = S;
+  renderMap();
+  renderPhaseCompare(snapshot, ph);
+  renderPhaseCounts(snapshot, ph);
 
-  /* ---- hero: camera mean brightness ---- */
-  const camMean = bucketMean(S.dgt_camera, 1);
-  document.getElementById("hero-now").textContent = camMean.length ? fmtNum(camMean[camMean.length - 1].y) + " / 255" : "—";
-  renderLineChart(document.getElementById("hero-chart"), camMean, { color: "var(--hue-blue)", unit: "/ 255", height: 260, pxHeight: 300, band });
-
-  /* ---- REE solar generation ---- */
+  /* ---- narrowed to selected city, where the source has coordinates ---- */
+  const cameraRecords = byCity(S.dgt_camera);
+  const camMean = bucketMean(cameraRecords, 1);
   const reeSeries = toSeries(S.ree);
-  document.getElementById("ree-now").textContent = reeSeries.length ? fmtNum(reeSeries[reeSeries.length - 1].y) + " MW" : "—";
-  renderLineChart(document.getElementById("ree-chart"), reeSeries, { color: "var(--hue-gold)", unit: "MW", band });
-
-  /* ---- AEMET small multiples ---- */
-  const aemetGrid = document.getElementById("aemet-grid");
-  aemetGrid.innerHTML = "";
-  const aemetGroups = groupBy(S.aemet, "station_or_camera_id");
-  if (aemetGroups.size === 0) {
-    aemetGrid.innerHTML = '<div class="empty-state"><span class="glyph">○</span>No AEMET data in this window yet.</div>';
-  } else {
-    [...aemetGroups.values()].sort((a, b) => a[0].label.localeCompare(b[0].label)).forEach(recs => {
-      const series = toSeries(recs);
-      const last = series[series.length - 1];
-      const card = document.createElement("div");
-      card.className = "sm-card";
-      card.innerHTML = `<div class="sm-title">${recs[0].label}</div><div class="sm-now">${fmtNum(last.y)}<span class="sm-unit"> °C</span></div><div class="sm-spark"></div>`;
-      renderSpark(card.querySelector(".sm-spark"), series, "var(--hue-orange)");
-      aemetGrid.appendChild(card);
-    });
-  }
-
-  /* ---- trends ---- */
+  const aemetRecords = byCity(S.aemet);
   const trendsSeries = toSeries(S.trends);
-  document.getElementById("trends-now").textContent = trendsSeries.length ? fmtNum(trendsSeries[trendsSeries.length - 1].y) : "—";
-  renderLineChart(document.getElementById("trends-chart"), trendsSeries, { color: "var(--hue-violet)", unit: "/ 100" });
+
+  /* ---- combined multi-source chart + current-value legend ---- */
+  const comboSeries = [
+    { key: "ree", label: "Solar (REE)", color: cssVar("--hue-gold") || "#eda100", unit: " MW", digits: 0, points: reeSeries },
+    { key: "camera", label: "Brillo cámara", color: cssVar("--hue-blue") || "#3987e5", unit: "/255", digits: 0, points: camMean },
+    { key: "aemet", label: "Temperatura", color: cssVar("--hue-orange") || "#d95926", unit: "°C", digits: 1, points: bucketMean(aemetRecords, 15) },
+    { key: "trends", label: "Búsquedas", color: cssVar("--hue-violet") || "#9085e9", unit: "/100", digits: 0, points: trendsSeries },
+    { key: "incidents", label: "Incidencias", color: cssVar("--status-crit") || "#e66767", unit: "", digits: 0, points: bucketCount(byCity(S.dgt_traffic), 15) },
+  ];
+  renderComboChart(document.getElementById("combo-chart"), comboSeries, { band, pxHeight: 320 });
+  document.getElementById("combo-legend").innerHTML = comboSeries.map(s => {
+    const last = s.points[s.points.length - 1];
+    const val = last ? fmtNum(last.y, s.digits) + s.unit : "—";
+    return `<div class="combo-legend-item"><span class="dot" style="background:${s.color}"></span><span class="cl-name">${s.label}</span><span class="cl-val">${val}</span></div>`;
+  }).join("");
+
+  /* ---- por ciudad: temperatura + brillo de cámara ---- */
+  renderCityTable(document.getElementById("city-table"), aemetRecords, cameraRecords);
 
   /* ---- dgt traffic bars ---- */
-  const dgtGroups = groupBy(S.dgt_traffic, "label");
-  const dgtCounts = [...dgtGroups.entries()].map(([label, recs]) => ({ label, value: new Set(recs.map(r => r.station_or_camera_id)).size }))
-    .sort((a, b) => b.value - a.value);
+  const trafficRecords = byCity(S.dgt_traffic);
+  const dgtGroups = groupBy(trafficRecords, "label");
+  const dgtCounts = [...dgtGroups.entries()].map(([label, recs]) => ({
+    label, value: new Set(recs.map(r => r.station_or_camera_id)).size, city: nearestPathCity(recs[0].lat, recs[0].lon),
+  })).sort((a, b) => b.value - a.value);
   document.getElementById("dgt-total").textContent = dgtCounts.reduce((s, d) => s + d.value, 0) || "—";
   const barsEl = document.getElementById("dgt-bars");
   barsEl.innerHTML = "";
   if (!dgtCounts.length) {
-    barsEl.innerHTML = '<div class="empty-state"><span class="glyph">○</span>No incidents recorded in this window.</div>';
+    barsEl.innerHTML = '<div class="empty-state"><span class="glyph">○</span>Sin datos en esta selección.</div>';
   } else {
     const max = Math.max(...dgtCounts.map(d => d.value));
     dgtCounts.forEach(d => {
       const row = document.createElement("div");
       row.className = "bar-row";
+      row.dataset.cityCard = d.city || "";
       row.innerHTML = `<div class="bar-label">${d.label}</div><div class="bar-track"><div class="bar-fill" style="width:${(d.value / max) * 100}%"></div></div><div class="bar-value">${d.value}</div>`;
       barsEl.appendChild(row);
     });
   }
 
-  /* ---- camera small multiples ---- */
-  const camGrid = document.getElementById("camera-grid");
-  camGrid.innerHTML = "";
-  const camGroups = groupBy(S.dgt_camera, "station_or_camera_id");
-  if (camGroups.size === 0) {
-    camGrid.innerHTML = '<div class="empty-state"><span class="glyph">○</span>No camera data in this window yet.</div>';
-  } else {
-    [...camGroups.values()].sort((a, b) => a[0].label.localeCompare(b[0].label)).forEach(recs => {
-      const series = toSeries(recs);
-      const last = series[series.length - 1];
-      const card = document.createElement("div");
-      card.className = "sm-card";
-      card.innerHTML = `<div class="sm-title">${recs[0].label} · cam ${recs[0].station_or_camera_id}</div><div class="sm-now">${fmtNum(last.y)}<span class="sm-unit"> / 255</span></div><div class="sm-spark"></div>`;
-      renderSpark(card.querySelector(".sm-spark"), series, "var(--hue-blue)");
-      camGrid.appendChild(card);
-    });
-  }
-
-  /* ---- KPI row ---- */
-  const kpiRow = document.getElementById("kpi-row");
-  kpiRow.innerHTML = "";
-  const lastRee = reeSeries[reeSeries.length - 1];
-  const prevRee = reeSeries[reeSeries.length - 2];
-  let reeDelta = "", reeDir = "";
-  if (lastRee && prevRee) {
-    const diff = lastRee.y - prevRee.y;
-    reeDir = diff >= 0 ? "up" : "down";
-    reeDelta = (diff >= 0 ? "+" : "") + fmtNum(diff) + " MW vs previous";
-  }
-  kpiRow.appendChild(kpiTile("Solar generation", lastRee ? fmtNum(lastRee.y) : "—", "MW", reeSeries.slice(-16), "var(--hue-gold)", reeDelta, reeDir));
-
-  const camNow = camMean.length ? camMean[camMean.length - 1].y : null;
-  kpiRow.appendChild(kpiTile("Mean camera brightness", camNow !== null ? fmtNum(camNow) : "—", "/ 255", camMean.slice(-16), "var(--hue-blue)"));
-
-  const aemetVals = [...aemetGroups.values()].map(recs => toSeries(recs)).filter(s => s.length).map(s => s[s.length - 1].y);
-  const aemetMean = aemetVals.length ? aemetVals.reduce((a, b) => a + b, 0) / aemetVals.length : null;
-  kpiRow.appendChild(kpiTile("Mean temperature", aemetMean !== null ? fmtNum(aemetMean) : "—", "°C", bucketMean(S.aemet, 10).slice(-16), "var(--hue-orange)"));
-
-  const lastTrend = trendsSeries[trendsSeries.length - 1];
-  kpiRow.appendChild(kpiTile("Search interest", lastTrend ? fmtNum(lastTrend.y) : "—", "/ 100", trendsSeries.slice(-16), "var(--hue-violet)"));
-
-  const totalIncidents = dgtCounts.reduce((s, d) => s + d.value, 0);
-  kpiRow.appendChild(kpiTile("Road incidents today", totalIncidents ? String(totalIncidents) : "0", "provinces: " + dgtCounts.length, null, "var(--hue-blue)"));
+  highlightCity();
 }
 
-async function load() {
-  const banner = document.getElementById("error-banner");
-  try {
-    const res = await fetch(DATA_URL + "?t=" + Date.now(), { cache: "no-store" });
-    if (!res.ok) throw new Error("HTTP " + res.status);
-    const snapshot = await res.json();
-    banner.classList.remove("show");
-    render(snapshot);
-  } catch (err) {
-    banner.textContent = "Live snapshot unavailable right now (" + err.message + "). Retrying every 20s — this is expected outside the scheduled ingestion windows.";
-    banner.classList.add("show");
-  }
-}
-
-load();
-setInterval(load, REFRESH_MS);
+render(SNAPSHOT);
 </script>
 </body>
 </html>

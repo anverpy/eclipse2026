@@ -1,135 +1,78 @@
-# Technical plan: multi-source ingestion — Solar eclipse, August 12, 2026
+# Eclipse 2026 — Live data pipeline for Spain's total solar eclipse
 
-## Event context
+**[→ Live dashboard](https://anverpy.github.io/eclipse2026/)**
 
-- Total solar eclipse, **August 12, 2026**, Spain.
-- Totality path: A Coruña → Palma, passing through Lugo, Asturias, León, Burgos, Soria, Zaragoza, Teruel, Castellón.
-- Totality: ~20:27–20:35h (duration 1–1.7 min). Partial phase from ~19:30h.
-- Target ingestion window: **18:30–21:30h**.
-- Document drafted: August 7, 2026, last updated August 9 → **3 days left** until the event.
+On **August 12, 2026**, a total solar eclipse crosses mainland Spain along a narrow band from A Coruña to Palma de Mallorca — the first one visible from Spain in decades. This project pulls together five independent public data sources along that path and republishes them as a free, live public dashboard, built end-to-end as a data engineering portfolio project on AWS.
 
-## Project goal
+It's not trying to be the most sophisticated pipeline possible — the explicit design priority, end to end, was **minimum cost**. The whole thing is built to run its one live event day for a few dollars, on a serverless, pay-per-use architecture, with a hard budget alarm from day one.
 
-(Semi-)automatic multi-source ingestion pipeline on AWS, as a data engineering portfolio project, that "goes wild" on eclipse day. Explicit priority: **minimum AWS cost** (or alternative hosting) over architectural sophistication or visualization.
+## What it tracks
 
-## Cost goal (cross-cutting constraint)
+Five public data sources, all served from the project's own infrastructure (never proxied live from the original APIs):
 
-- Minimize cost as a design criterion, not a later optimization.
-- Maximize free-tier use: Lambda, S3, minimal Glue, Athena on-demand.
-- Single-day event, low-medium volume → preliminary estimate: a few dollars, worst-case cap ~$10-20 USD.
-- **Mandatory action**: AWS Budgets alarm from project kickoff (real risk of leaving resources running given the tight timeline).
-- Always prefer pay-per-use serverless services over resources with a fixed hourly cost.
+| Source | What | Why it's here |
+|---|---|---|
+| ⚡ **REE** (Red Eléctrica de España) | Real-time solar photovoltaic generation, mainland Spain | Should visibly dip during totality — the "hero" metric |
+| 🌡️ **AEMET** (Agencia Estatal de Meteorología) | Temperature at 10 stations along the totality path | The eclipse cools the air measurably as the sky darkens |
+| 🚦 **DGT Tráfico** (Dirección General de Tráfico) | Active road incidents, official national feed | People pull over to watch — does traffic behavior show it? |
+| ☀️ **DGT Cámaras** (Dirección General de Tráfico) | Mean brightness from 9 official highway cameras | The most direct read on the sky actually darkening |
+| 🔍 **Google Trends** | National search interest for "eclipse" | Public attention, before/during/after |
 
-## Data sources (5) and current status
+Coverage is limited to the 10 cities along the totality path plus mainland Spain and Palma — it's not a nationwide dataset, by design.
 
-**All 5 sources are deployed and tested live against real AWS** (Lambda → S3 direct, no Kinesis/Firehose/DynamoDB — see decision 8). Details on how each one got built are in CHANGELOG.md (2026-08-09); here's just the final state.
+## How it's built
 
-### 1. REE — electricity generation (photovoltaic)
-- ESIOS indicator `1295` ("Generación T.Real Solar fotovoltaica", geo_id 8741 Peninsula, ~5min resolution). Token in `terraform/terraform.tfvars` (gitignored, never in this README).
-- Relevant usage condition for the architecture: if the project goes public, data must be served from your own server (no direct calls to REE) and avoid mass/redundant requests.
-- "Hero" real-time source of the project.
-
-### 2. AEMET — weather (temperature)
-- API: AEMET OpenData (`opendata.aemet.es`), two-step flow, key in `terraform.tfvars`.
-- 10 curated stations along the totality path (one per city).
-
-### 3. DGT — traffic (active incidents)
-- API: NAP-DGT (`nap.dgt.es`), DATEX2 feed **public, no registration or key needed** (1min refresh).
-- Metric: `incidencia_activa` (DATEX2 incident presence — NAP-DGT has no public real-time traffic-volume/count feed, so this source covers incidents, not vehicle intensity), filtered to totality-path provinces.
-
-### 4. Google Trends — search interest
-- No official API, no `pytrends`: the same 3-call flow `pytrends` wraps, done by hand with `urllib` (cookie + explore + multiline) to avoid an extra dependency/layer.
-- Low priority, best-effort — `fetch()` never lets a Google block take down the Lambda, degrades to 0 records.
-
-### 5. Official traffic cameras (NAP-DGT)
-- Same public source as source 3. 9 curated cameras, one per totality-path province (Lugo, Asturias, León, Burgos, Soria, Zaragoza, Teruel, Castellón, A Coruña).
-- **Closed decision**: use official NAP-DGT cameras, not loose tourist webcams (lower legal/stability risk; the movement data is a secondary aggregate of the report, not the centerpiece).
-- Metric: mean brightness per frame (Pillow, packaged as a Lambda layer — no Docker, manylinux wheel via `pip --platform`).
-- Cadence: 2min in the 18:30–21:30h window; 1min in 20:15–20:45h (EventBridge Scheduler's `rate()` floor — the original 10-15s target would need a Lambda with an internal loop or Step Functions, evaluate after the dry run).
-
-## Out of scope (dropped for live ingestion)
-
-- **Hospital ER admissions by reason**: no public real-time source exists in Spain (protected health data).
-- Partial alternative: Castilla y León open-data portal (within the totality path) publishes ER data with triage level, hospital, province, age, sex — but with **monthly** updates.
-- Treatment: possible retrospective analysis (phase 2, weeks after the event), **out of the live 12-A pipeline**.
-
-## Unified data schema
-
-Common envelope for all sources, meant to allow unifying everything into a single partitioned Athena table:
-
-```json
-{
-  "source": "ree | aemet | dgt_traffic | trends | dgt_camera",
-  "ts_utc": "ISO8601",
-  "station_or_camera_id": "string",
-  "lat": "float",
-  "lon": "float",
-  "metric_name": "string",
-  "value": "float",
-  "unit": "string",
-  "raw": {}
-}
+```
+5 sources → Lambda (fetch + normalize) → S3 (partitioned data lake)
+                                            │
+                                            ├── Glue Catalog + Athena (ad-hoc SQL queries)
+                                            │
+                                            └── aggregator Lambda → public S3 bucket → GitHub Pages dashboard
 ```
 
-Partition in S3: `source=<X>/dt=2026-08-12/hour=<HH>/`
+- **Ingestion**: one AWS Lambda per source, each polling on its own schedule via **EventBridge Scheduler**, writing directly to S3 as partitioned newline-delimited JSON. No Kinesis/Firehose/DynamoDB — a live event with a few dozen readings a minute doesn't need a streaming platform, and every extra moving part is extra cost and extra risk on event day.
+- **Cadence** tightens automatically during totality (as low as ~20s for the two highest-signal metrics — camera brightness and the dashboard snapshot) and goes fully dormant outside two bounded windows: an Aug 11 dry run and the real Aug 12 event.
+- **Storage & query**: S3 as the data lake, cataloged in Glue with **partition projection** (no crawler needed — the schema and partitioning scheme are fixed upfront), queryable ad-hoc through Athena with a scanned-data cap as a cost guardrail.
+- **Public dashboard**: a small `aggregator` Lambda distills the raw data into a lightweight public JSON snapshot, republished to a dedicated public S3 bucket every couple of minutes. The dashboard itself is a single self-contained HTML file — no frameworks, no build step, hand-rolled SVG charts — served for free on GitHub Pages.
+- **Infrastructure as code**: the entire stack (Lambdas, IAM roles, S3, Glue, Athena, EventBridge schedules, budget alarm) is defined in Terraform, so it can be stood up or fully torn down with one command.
 
-## AWS architecture
+## Repo layout
 
-- **Orchestration**: EventBridge Scheduler, 16 schedules bounded by `start_date`/`end_date` to 2026-08-11 (dry run) and 2026-08-12 (event) only — inert outside those windows. Two cadence tiers (normal + tighter during the totality sub-window 20:15–20:45) for `ree`/`dgt_traffic`/`dgt_camera`; flat cadence for `aemet` (10min) and `trends` (20min).
-- **Ingestion**: all 5 sources are Lambda → S3 direct (no Kinesis/Firehose/DynamoDB — decision 8, simplicity and cost over real-time "hero" streaming). XML→JSON (DGT) and all other parsing live inside each `fetch()`.
-- **Storage**: S3 (`eclipse2026-data-lake`) as data lake / landing zone, partitioned `source=<X>/dt=<date>/hour=<HH>/`, ndjson.
-- **Catalog**: Glue Data Catalog, database `eclipse2026_db`, single table `events` — **done** (`terraform/glue.tf`). No Crawler: schema is fixed (matches the unified envelope) and partitions (`source`/`dt`/`hour`) use **partition projection** instead of crawler/MSCK REPAIR — zero standing infra, no drift vs. actual S3 keys. `raw` is typed `string` (OpenX JsonSerDe auto-serializes the nested per-source JSON into it); query it with `json_extract()`.
-- **Query**: Athena — **done** (`terraform/athena.tf`). Workgroup `eclipse2026-wg`, dedicated results bucket, 1 GiB/query scanned cap (cost guardrail). Verified live against real `dt=2026-08-09` data (`ree`, `dgt_camera`).
-- **Visualization**: **done** — public live dashboard at [anverpy.github.io/eclipse2026](https://anverpy.github.io/eclipse2026/), GitHub Pages serving `docs/`. Not QuickSight (recurring per-author subscription cost, at odds with the pay-per-use goal, and this needed to be public anyway — GitHub Pages is free and public by default). Backed by a new `aggregator` Lambda (`terraform/aggregator.tf`) on the same EventBridge Scheduler pattern, republishing a distilled JSON snapshot (`raw` stripped) to a dedicated public S3 bucket (`terraform/public_site.tf`, public read scoped to that one object, CORS locked to the Pages origin) every 2min during the bounded windows — satisfies REE's "serve from your own server, no direct calls" condition (see source #1) since the public site never touches REE/AEMET/DGT/Trends directly.
+```
+terraform/    infrastructure as code — every AWS resource used by the project
+lambdas/      one folder per data source, plus shared schema/S3-writer code
+docs/         the public dashboard (docs/index.html), served via GitHub Pages
+admin.sh      single entrypoint for infra + day-to-day ops (see below)
+CHANGELOG.md  build history and notable decisions, in chronological order
+```
 
-## Key decisions already made
+## Running it locally
 
-1. Cameras: official NAP-DGT ones, not loose webcams. **Closed.**
-2. ER admissions by reason: out of the live pipeline, possible retrospective phase 2. **Closed.**
-3. REE: use ESIOS (indicator `1295`, token received) instead of REData — better temporal resolution (~5min) and the same response shape the code already expected. **Closed** (see also decision 8).
-4. General priority: robustness of ingestion across the 5 sources during the event over dashboard sophistication. **Closed.**
-5. Minimum cost as a design constraint in every architecture decision. **Closed.**
-6. IaC: **Terraform** (not CDK/SAM) — full coverage of every needed service in one tool, and `terraform destroy` gives guaranteed one-command teardown (critical given the cost risk in point 5). **Closed.**
-7. IAM: **one Lambda execution role per source** (not a shared role) — same cost (IAM is free), better least-privilege. Each role only has access to its own S3 prefix (`source=<X>/*`) and its own log group. Defined in `terraform/iam.tf`. **Closed.**
-8. Final ingestion pattern for all 5 sources: **Lambda → S3 direct**, no Kinesis/Firehose/DynamoDB — simplicity and cost over real-time "hero" streaming. IAM roles keep unused Kinesis/DynamoDB permissions (harmless, no cost). **Closed.**
-9. DGT traffic: metric redefined from "intensity" to `incidencia_activa` — NAP-DGT has no public real-time traffic-volume feed, only DATEX2 incidents. **Closed.**
-10. Catalog/query layer: hand-written Glue table (not Crawler-inferred) + partition projection (not MSCK REPAIR/Crawler-driven partition discovery) — schema is already known (envelope.py), so a Crawler would only add cost/moving parts without adding information. `raw` typed as `string`, not `struct`, since its shape varies per source. **Closed.**
+The dashboard is a static file — no build step:
 
-## Still to decide
+```bash
+./admin.sh preview          # serves docs/ at http://localhost:8000
+```
 
-- Sub-minute (10-15s) camera cadence during totality — currently 1min due to EventBridge Scheduler's `rate()` floor; would need a Lambda with an internal loop or Step Functions. Evaluate after the dry run if 1min turns out insufficient.
-- Rotate `andrew`'s access key (active unrotated since 2026-03-09) before closing out the project.
+The ingestion Lambdas can also run fully offline against saved fixture data, with no AWS credentials or network access required:
 
-## Calendar (from August 7)
+```bash
+./admin.sh local             # runs all 5 sources against fixtures, validates the schema
+./admin.sh local ree         # or just one source
+```
 
-- **Aug 7**: AEMET signup, initial technical plan, AWS account, Terraform installed. ✅
-- **Aug 8**: ESIOS token received, local dev mode (fixtures + harness). ✅
-- **Aug 9 (today)**: all 5 sources with real `fetch()`, deployed and tested live against AWS (not just `local`); EventBridge Scheduler configured and bounded to dry run + event; Glue Data Catalog + Athena table deployed and verified against live data; public live dashboard built and deployed (aggregator Lambda + GitHub Pages, see "AWS architecture"), repo published public at [github.com/anverpy/eclipse2026](https://github.com/anverpy/eclipse2026). Ahead of today's plan. ✅
-- **Aug 10**: buffer day — nothing blocking left before the dry run.
-- **Aug 11**: full dry run in the same time slot (18:30–21:30h) — EventBridge Scheduler fires it on its own now; freeze code afterward.
-- **Aug 12 (D-day)**: monitoring only, no code changes during the event.
+## What's deliberately out of scope
 
-## Operational tooling
+**Emergency room admissions.** Early on, ER admission data (by triage level, reason, hospital) looked like a compelling metric to correlate against the eclipse — but no source in Spain publishes that in real time, for the obvious reason that it's protected health data. The one open-data portal that does publish something close (Castilla y León, which sits on the totality path) only releases it **monthly**, so it can't be part of a live pipeline.
 
-- `terraform/` — AWS + archive + null provider (`main.tf`), variables (`variables.tf`), mandatory budget alarm (`budget.tf`, decision 5), per-source IAM roles (`iam.tf`, decision 7), data lake bucket (`s3.tf`), one Lambda per source (`lambda_ree.tf`, `lambda_aemet.tf`, `lambda_dgt_traffic.tf`, `lambda_dgt_camera.tf` — includes the Pillow layer, `lambda_trends.tf`), EventBridge Scheduler (`scheduler.tf`). Local state, no remote backend (solo project).
-- `admin.sh` — single entrypoint for infra + ops. Works with AWS CLI v1 and v2 (auto-detects version). Centralized source registry (name → Lambda function); adding a new source = one line in the registry.
-  - Infra: `init`, `plan`, `deploy`, `destroy` (asks for explicit typed confirmation), `status`.
-  - Ops: `invoke <source>`, `invoke-all`, `logs <source> [mins]`, `cost`, `dry-run`.
-  - Registered sources: `ree`, `aemet`, `dgt_traffic`, `trends`, `dgt_camera`.
-  - `local [source]` — offline mode, no network/AWS: runs a source's (or all 5) `handler()` with `fetch()` mocked against `lambdas/<source>/fixtures/sample_response.json`, validates the result against the unified schema. Details in `scripts/local_dev.py`.
-  - **Important**: `dry-run`/`invoke` make real calls to AWS and external APIs. Use carefully on Trends (Google block risk). For fast iteration during development, use `local` instead.
-- `lambdas/` — code for the 5 sources (`<source>/handler.py` + `fixtures/`), shared schema (`common/envelope.py`), and shared S3 writer (`common/s3_writer.py`, partitioned ndjson). All 5 `fetch()` functions catch their own errors and degrade to 0 records instead of taking down the Lambda. `scripts/local_dev.py` — harness for the `local` mode above.
+Rather than drop the idea entirely, the plan is to publish a short follow-up report once that portal's data for August lands — around the **end of the month** — looking specifically at admissions on eclipse day. That'll be a separate, retrospective piece of analysis, not part of the live dashboard above.
 
-## Current status (handoff for a new chat session)
+## Data sources & credit
 
-- AWS account `879381241577` (alias `andrew-aws123`), Paid plan, region `eu-west-1`. Operating user: `andrew` (group `admin`, `AdministratorAccess`) — never root.
-- **Infra fully deployed** (`terraform apply` applied, nothing pending): budget, 5 IAM roles + policies, bucket `eclipse2026-data-lake`, 5 Lambdas, Pillow layer, Glue Catalog (`eclipse2026_db.events`), Athena workgroup (`eclipse2026-wg`), `aggregator` Lambda, public bucket `eclipse2026-public`, 18 EventBridge Scheduler schedules total.
-- **Public live dashboard deployed and verified**: [anverpy.github.io/eclipse2026](https://anverpy.github.io/eclipse2026/) (GitHub Pages, `docs/`), fetching `https://eclipse2026-public.s3.eu-west-1.amazonaws.com/latest.json` directly — confirmed working end-to-end against real production CORS (locked to the Pages origin only). Repo is public: [github.com/anverpy/eclipse2026](https://github.com/anverpy/eclipse2026).
-- **All 5 sources tested live** with `./admin.sh invoke <source>` — real data confirmed in S3 (`source=<X>/dt=2026-08-09/hour=.../*.json`) for all 5. Per-source detail in "Data sources" above; build history for each in CHANGELOG.md (2026-08-09).
-- **Glue/Athena layer tested live**: `SELECT ... FROM eclipse2026_db.events WHERE dt='2026-08-09'` returns real rows across sources (`ree`, `dgt_camera` confirmed) via partition projection, no crawler/MSCK needed. Note: raw `aws athena`/`aws glue` CLI calls need `--region eu-west-1` explicitly (CLI default profile region is `us-east-1`); `admin.sh`/terraform already pin the right region via `var.aws_region`.
-- EventBridge Scheduler deployed but **inert until 2026-08-11 16:30 UTC** (18:30 local) — nothing needs manual invoking until then, the scheduler fires the dry run and the event on its own.
-- Current cost: ~$0 (see `./admin.sh cost`). Nothing with a fixed hourly cost deployed; Athena is pay-per-scan with a 1 GiB/query cap.
-- **Everything from README "Project goal" is done**: ingestion, catalog/query, and public visualization. Nothing blocking before the Aug 11 dry run.
-- Pending, not blocking: sub-minute camera cadence, rotate `andrew`'s access key — see "Still to decide".
+- Electricity generation: [REE ESIOS](https://www.esios.ree.es/)
+- Weather: [AEMET OpenData](https://opendata.aemet.es/)
+- Traffic incidents & cameras: [NAP-DGT](https://nap.dgt.es/) (Punto de Acceso Nacional, Dirección General de Tráfico)
+- Search interest: Google Trends
+- Totality-path map & phase-progression reference images: [Instituto Geográfico Nacional](https://astronomia.ign.es/eclipses-de-sol-y-luna/eclipse-total-sol-de-12-de-agosto-2026)
 
-Change history: see [CHANGELOG.md](CHANGELOG.md).
+Full build history and design decisions are in [CHANGELOG.md](CHANGELOG.md).

@@ -14,6 +14,7 @@ see terraform/lambda_dgt_camera.tf).
 
 import io
 import os
+import time
 import urllib.request
 from datetime import datetime, timezone
 
@@ -22,6 +23,14 @@ from lambdas.common.s3_writer import write_records
 
 METRIC_NAME = "brillo_medio"
 UNIT = "0_255"
+
+# During totality (event.tier == "tight") a single 1-minute EventBridge tick
+# fans out into a few internal captures instead of one — EventBridge
+# Scheduler's rate() floors at 1 minute, so sub-minute cadence can only come
+# from looping inside an invocation. Bounded by the Lambda's own timeout
+# (see terraform/lambda_dgt_camera.tf) as an independent stop.
+TIGHT_TICKS = 3
+TIGHT_TICK_INTERVAL_S = 20
 
 # camera_id -> (province, road, lat, lon); deviceUrl is always
 # https://etraffic.dgt.es/camarasEtraffic/<camera_id>.jpg
@@ -69,7 +78,7 @@ def fetch(event: dict) -> list:
     return frames
 
 
-def handler(event: dict, context=None) -> dict:
+def _capture_tick(event: dict, bucket: str | None) -> list:
     raw = fetch(event)
     records = [
         make_envelope(
@@ -85,7 +94,19 @@ def handler(event: dict, context=None) -> dict:
         )
         for frame in raw
     ]
-    bucket = os.environ.get("DATA_LAKE_BUCKET")
     if records and bucket:
         write_records(bucket, "dgt_camera", records)
-    return {"source": "dgt_camera", "count": len(records), "records": records}
+    return records
+
+
+def handler(event: dict, context=None) -> dict:
+    bucket = os.environ.get("DATA_LAKE_BUCKET")
+    ticks = TIGHT_TICKS if event.get("tier") == "tight" else 1
+
+    all_records = []
+    for i in range(ticks):
+        all_records.extend(_capture_tick(event, bucket))
+        if i < ticks - 1:
+            time.sleep(TIGHT_TICK_INTERVAL_S)
+
+    return {"source": "dgt_camera", "count": len(all_records), "records": all_records}

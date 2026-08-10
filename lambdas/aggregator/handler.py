@@ -10,6 +10,7 @@ Athena (see terraform/glue.tf) for anyone who wants to dig in.
 
 import json
 import os
+import time
 from datetime import datetime, timezone
 
 import boto3
@@ -17,6 +18,12 @@ import boto3
 _s3 = boto3.client("s3")
 
 SOURCES = ["ree", "aemet", "dgt_traffic", "trends", "dgt_camera"]
+
+# Mirrors dgt_camera's tight-tier tick loop (see lambdas/dgt_camera/handler.py)
+# so the public snapshot actually refreshes as often as the camera captures
+# during totality, instead of sitting on stale data for a full 1-minute tick.
+TIGHT_TICKS = 3
+TIGHT_TICK_INTERVAL_S = 20
 
 # human-readable label per record, pulled from `raw` (which the public
 # payload otherwise drops entirely) — small-multiples charts need it since
@@ -59,9 +66,7 @@ def _read_source(bucket: str, source: str, dt: str) -> list:
     return records
 
 
-def handler(event: dict, context=None) -> dict:
-    data_bucket = os.environ["DATA_LAKE_BUCKET"]
-    public_bucket = os.environ["PUBLIC_BUCKET"]
+def _publish_snapshot(data_bucket: str, public_bucket: str) -> dict:
     dt = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     snapshot = {
@@ -79,3 +84,16 @@ def handler(event: dict, context=None) -> dict:
         CacheControl="public, max-age=15",
     )
     return {"bytes": len(body), "counts": {k: len(v) for k, v in snapshot["sources"].items()}}
+
+
+def handler(event: dict, context=None) -> dict:
+    data_bucket = os.environ["DATA_LAKE_BUCKET"]
+    public_bucket = os.environ["PUBLIC_BUCKET"]
+    ticks = TIGHT_TICKS if event.get("tier") == "tight" else 1
+
+    result = None
+    for i in range(ticks):
+        result = _publish_snapshot(data_bucket, public_bucket)
+        if i < ticks - 1:
+            time.sleep(TIGHT_TICK_INTERVAL_S)
+    return result

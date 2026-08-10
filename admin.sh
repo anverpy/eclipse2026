@@ -39,6 +39,8 @@ Ops:
   dry-run               full-cycle simulation: invoke all sources once
   local [source]        run handler(s) locally against fixtures — no AWS, no network
                          (omit source to run all; see scripts/local_dev.py)
+  preview [port]        serve docs/ at http://localhost:<port>/ (default 8000)
+                         — for viewing frontend changes; Ctrl+C to stop
 
 Sources: ${!SOURCES[*]}
 EOF
@@ -132,6 +134,14 @@ cmd_local() {
   fi
 }
 
+cmd_preview() {
+  local port="${1:-8000}"
+  local docs_dir
+  docs_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/docs" && pwd)"
+  echo "serving $docs_dir at http://localhost:${port}/ (Ctrl+C to stop)"
+  ( cd "$docs_dir" && python3 -m http.server "$port" )
+}
+
 case "${1:-}" in
   init)       cmd_init ;;
   plan)       cmd_plan ;;
@@ -144,5 +154,6 @@ case "${1:-}" in
   cost)       cmd_cost ;;
   dry-run)    cmd_dry_run ;;
   local)      shift; cmd_local "$@" ;;
+  preview)    shift; cmd_preview "$@" ;;
   *)          usage; exit 1 ;;
 esac

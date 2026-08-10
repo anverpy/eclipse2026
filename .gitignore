@@ -7,3 +7,7 @@ __pycache__/
 
 # reference material not ready for the public repo yet (see CHANGELOG)
 /assets/
+
+# internal dev reference (full decision log, ops/handoff detail) — public
+# repo gets README.md instead, see there
+/AGENTS.md

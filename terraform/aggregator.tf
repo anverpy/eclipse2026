@@ -71,8 +71,10 @@ resource "aws_lambda_function" "aggregator" {
   role          = aws_iam_role.aggregator.arn
   handler       = "lambdas.aggregator.handler.handler"
   runtime       = "python3.12"
-  timeout       = 30
-  memory_size   = 128
+  # 30s covers a single-tick (normal-tier) publish; tight-tier ticks 3x with
+  # a 20s sleep between each (see handler.py), so needs headroom above 30s.
+  timeout     = 90
+  memory_size = 128
 
   filename         = data.archive_file.aggregator_lambda.output_path
   source_code_hash = data.archive_file.aggregator_lambda.output_base64sha256

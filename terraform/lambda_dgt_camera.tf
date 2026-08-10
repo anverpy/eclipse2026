@@ -76,9 +76,11 @@ resource "aws_lambda_function" "dgt_camera_poller" {
   role          = aws_iam_role.poller["dgt_camera"].arn
   handler       = "lambdas.dgt_camera.handler.handler"
   runtime       = "python3.12"
-  timeout       = 60
-  memory_size   = 512
-  layers        = [aws_lambda_layer_version.pillow.arn]
+  # 60s covers a single-tick (normal-tier) run; tight-tier ticks 3x with a
+  # 20s sleep between each (see handler.py), so needs headroom above 60s.
+  timeout     = 90
+  memory_size = 512
+  layers      = [aws_lambda_layer_version.pillow.arn]
 
   filename         = data.archive_file.dgt_camera_lambda.output_path
   source_code_hash = data.archive_file.dgt_camera_lambda.output_base64sha256
