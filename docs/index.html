@@ -298,6 +298,7 @@
   .chart-baseline { stroke: var(--baseline); stroke-width: 1; }
   .chart-tick { fill: var(--text-muted); font-family: var(--font-data); font-size: 10.5px; }
   .chart-endcap { stroke: var(--surface-1); stroke-width: 2; }
+  .chart-point { opacity: 0.5; }
   .chart-band { opacity: 0.85; }
   .chart-band-label { fill: var(--text-muted); font-family: var(--font-data); font-size: 9.5px; letter-spacing: 0.06em; text-transform: uppercase; }
   .crosshair-line { stroke: var(--border-strong); stroke-width: 1; }
@@ -524,9 +525,15 @@
   <section>
     <div class="section-head">
       <h2>Todas las fuentes en el tiempo</h2>
-      <div class="section-note">Las cinco fuentes en una sola visualización, gobernada por los filtros de «Ventana temporal» y «Ciudad» de arriba. Cada serie está normalizada a una escala relativa 0–100 para comparar su forma en el mismo eje temporal; los valores reales están en la leyenda y al pasar el cursor.</div>
+      <div class="section-note">Las cinco fuentes en una sola visualización, gobernada por los filtros de «Ventana temporal» y «Ciudad» de arriba, más la ventana reciente de abajo (independiente, solo afecta a este gráfico). Cada serie está normalizada a una escala relativa 0–100 dentro de la ventana visible para comparar su forma en el mismo eje temporal; los valores reales están en la leyenda y al pasar el cursor.</div>
     </div>
     <div class="card hero-card">
+      <div class="chip-row" id="combo-window-chips" style="margin-bottom:14px">
+        <button type="button" class="chip" data-combo-window="15">15 min</button>
+        <button type="button" class="chip active" data-combo-window="60">1 h</button>
+        <button type="button" class="chip" data-combo-window="180">3 h</button>
+        <button type="button" class="chip" data-combo-window="all">Todo</button>
+      </div>
       <div class="combo-legend" id="combo-legend"></div>
       <div class="chart-wrap" id="combo-chart"></div>
     </div>
@@ -659,6 +666,13 @@ const FILTERS = {
   window: "all",
   cities: new Set(), // empty = all cities; unlike "Ventana temporal", this filter is multi-select
 };
+
+// Independent of FILTERS: only clamps the "Todas las fuentes" combo chart's
+// x-axis to a recent rolling window (anchored to wall-clock now, not the
+// latest data point — a stalled source shows as a trailing gap instead of
+// silently rescaling), so fast-cadence sources don't get visually flattened
+// across the full event window. null = no clamp ("Todo").
+let comboWindowMinutes = 60;
 
 // Official timing (IGN + project plan, all Spain-peninsula local clock times converted
 // to UTC): partial phase begins ~19:30 (17:30 UTC); totality 20:27-20:35 (18:27-18:35
@@ -1015,6 +1029,16 @@ document.querySelectorAll("#window-chips .chip").forEach(btn => {
   });
 });
 
+document.querySelectorAll("#combo-window-chips .chip").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const val = btn.dataset.comboWindow === "all" ? null : Number(btn.dataset.comboWindow);
+    if (val === comboWindowMinutes) return;
+    comboWindowMinutes = val;
+    document.querySelectorAll("#combo-window-chips .chip").forEach(b => b.classList.toggle("active", b === btn));
+    render(SNAPSHOT);
+  });
+});
+
 const cityChipsEl = document.getElementById("city-chips");
 TOTALITY_PATH.forEach(c => {
   const btn = document.createElement("button");
@@ -1168,7 +1192,19 @@ function bucketCount(records, bucketMinutes) {
 function renderComboChart(container, series, opts) {
   opts = opts || {};
   container.innerHTML = "";
-  const active = series.filter(s => s.points.length >= 2);
+
+  // windowMs clamps to a recent rolling window, anchored to wall-clock now
+  // rather than the latest data point, so a stalled source shows up as a
+  // trailing gap instead of the chart silently rescaling to hide it.
+  let windowed = series;
+  let xMin, xMax;
+  if (opts.windowMs) {
+    xMax = Date.now();
+    xMin = xMax - opts.windowMs;
+    windowed = series.map(s => Object.assign({}, s, { points: s.points.filter(p => p.x.getTime() >= xMin) }));
+  }
+
+  const active = windowed.filter(s => s.points.length >= 2);
   if (!active.length) {
     container.innerHTML = '<div class="empty-state"><span class="glyph">○</span>Sin datos en esta selección.</div>';
     return;
@@ -1183,8 +1219,10 @@ function renderComboChart(container, series, opts) {
     return Object.assign({}, s, { norm: s.points.map(p => ({ x: p.x, y: p.y, n: ((p.y - lo) / (hi - lo)) * 100 })) });
   });
 
-  const allX = normed.flatMap(s => s.norm.map(p => p.x.getTime()));
-  const xMin = Math.min(...allX), xMax = Math.max(...allX);
+  if (!opts.windowMs) {
+    const allX = normed.flatMap(s => s.norm.map(p => p.x.getTime()));
+    xMin = Math.min(...allX); xMax = Math.max(...allX);
+  }
   const xScale = t => padL + (xMax === xMin ? plotW / 2 : ((t - xMin) / (xMax - xMin)) * plotW);
   const yScale = n => padT + plotH - (n / 100) * plotH;
 
@@ -1217,6 +1255,9 @@ function renderComboChart(container, series, opts) {
     let d = "";
     s.norm.forEach((p, i) => { d += (i === 0 ? "M " : "L ") + xScale(p.x.getTime()) + " " + yScale(p.n) + " "; });
     svg.appendChild(svgEl("path", { d, stroke: s.color, class: "chart-line" }));
+    s.norm.slice(0, -1).forEach(p => {
+      svg.appendChild(svgEl("circle", { cx: xScale(p.x.getTime()), cy: yScale(p.n), r: 2.5, fill: s.color, class: "chart-point" }));
+    });
     const last = s.norm[s.norm.length - 1];
     svg.appendChild(svgEl("circle", { cx: xScale(last.x.getTime()), cy: yScale(last.n), r: 4, fill: s.color, class: "chart-endcap" }));
   });
@@ -1334,7 +1375,7 @@ function render(snapshot) {
     { key: "trends", label: "Búsquedas", color: cssVar("--hue-violet") || "#9085e9", unit: "/100", digits: 0, points: trendsSeries },
     { key: "incidents", label: "Incidencias", color: cssVar("--status-crit") || "#e66767", unit: "", digits: 0, points: bucketCount(byCity(S.dgt_traffic), 15) },
   ];
-  renderComboChart(document.getElementById("combo-chart"), comboSeries, { bands, pxHeight: 320 });
+  renderComboChart(document.getElementById("combo-chart"), comboSeries, { bands, pxHeight: 320, windowMs: comboWindowMinutes ? comboWindowMinutes * 60000 : null });
   document.getElementById("combo-legend").innerHTML = comboSeries.map(s => {
     const last = s.points[s.points.length - 1];
     const val = last ? fmtNum(last.y, s.digits) + s.unit : "—";
