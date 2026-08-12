@@ -11,3 +11,6 @@ __pycache__/
 # internal dev reference (full decision log, ops/handoff detail) — public
 # repo gets README.md instead, see there
 /AGENTS.md
+
+# ESIOS token, plaintext — never commit
+/attach.txt
