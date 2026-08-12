@@ -515,7 +515,7 @@
     </div>
     <div class="card hero-card">
       <div class="phase-compare" id="phase-compare"></div>
-      <div class="phase-legend">Horario oficial (IGN, España peninsular): Antes — antes de las 19:30h (17:30 UTC), inicio de la fase parcial. Parcial — fases parciales antes y después de la totalidad, hasta ≈21:25h (19:25 UTC) según la referencia de Madrid del IGN. Totalidad — 20:27–20:35h (18:27–18:35 UTC), duración real 1–1,7 min según el punto del camino. Después — tras el último contacto parcial. Mismo horario para el simulacro del 11 de agosto y el evento del 12.</div>
+      <div class="phase-legend">Horario oficial (IGN, España peninsular): Antes — antes de las 19:30h (17:30 UTC), inicio de la fase parcial. Parcial — fases parciales antes y después de la totalidad, hasta ≈21:25h (19:25 UTC) según la referencia de Madrid del IGN. Totalidad — 20:27–20:35h (18:27–18:35 UTC), duración real 1–1,7 min según el punto del camino. Después — tras el último contacto parcial. Captura de alta frecuencia — 19:20–20:45h (17:20–18:45 UTC): desde 10 min antes del primer contacto hasta 10 min después del fin de la totalidad, las fuentes principales capturan a mayor cadencia. Mismo horario para el simulacro del 11 de agosto y el evento del 12 (el simulacro conserva la ventana de alta frecuencia original, centrada solo en la totalidad).</div>
       <div class="phase-metric-title" style="margin-top:26px">Recuento de lecturas por fase <span style="font-weight:400;color:var(--text-muted)">— por fuente, para comprobar que la ingesta cubre las cuatro fases</span></div>
       <div class="phase-counts" id="phase-counts"></div>
     </div>
@@ -664,12 +664,20 @@ const FILTERS = {
 // to UTC): partial phase begins ~19:30 (17:30 UTC); totality 20:27-20:35 (18:27-18:35
 // UTC, real duration 1-1.7 min depending on the point along the path); partial phase
 // ends ~21:25 (19:25 UTC) at the IGN's Madrid reference. Same clock times for the Aug 11
-// dry run and the Aug 12 event.
+// dry run and the Aug 12 event. tightStart/tightEnd mirror terraform/scheduler.tf's
+// event-day "tight" cadence schedules: boosted capture starts 10 min before first
+// contact (partialStart) and runs through 10 min past totalityEnd, so it's not a phase
+// boundary of its own — classifyPhase still reports every point in that range per the
+// normal antes/parcial/totalidad rules, this just marks where the source data gets denser.
 function eclipsePhases(dt) {
+  const partialStart = new Date(dt + "T17:30:00Z");
+  const totalityEnd = new Date(dt + "T18:35:00Z");
   return {
-    partialStart: new Date(dt + "T17:30:00Z"),
+    tightStart: new Date(partialStart.getTime() - 10 * 60000),
+    partialStart,
     totalityStart: new Date(dt + "T18:27:00Z"),
-    totalityEnd: new Date(dt + "T18:35:00Z"),
+    totalityEnd,
+    tightEnd: new Date(totalityEnd.getTime() + 10 * 60000),
     partialEnd: new Date(dt + "T19:25:00Z"),
   };
 }
@@ -1163,17 +1171,18 @@ function renderComboChart(container, series, opts) {
   const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, class: "chart-svg", preserveAspectRatio: "none" });
   svg.style.width = "100%"; svg.style.height = (opts.pxHeight || 320) + "px";
 
-  if (opts.band) {
-    const bx1 = xScale(opts.band.start.getTime());
-    const bx2 = xScale(opts.band.end.getTime());
+  const bands = opts.bands || (opts.band ? [opts.band] : []);
+  bands.forEach(b => {
+    const bx1 = xScale(b.start.getTime());
+    const bx2 = xScale(b.end.getTime());
     if (bx2 > padL && bx1 < W - padR) {
       const rx1 = Math.max(padL, bx1), rx2 = Math.min(W - padR, bx2);
-      svg.appendChild(svgEl("rect", { x: rx1, y: padT, width: Math.max(1, rx2 - rx1), height: plotH, fill: "var(--hue-gold-dim)", class: "chart-band" }));
+      svg.appendChild(svgEl("rect", { x: rx1, y: padT, width: Math.max(1, rx2 - rx1), height: plotH, fill: b.fill || "var(--hue-gold-dim)", class: "chart-band" }));
       const lbl = svgEl("text", { x: rx1 + 4, y: padT + 12, class: "chart-band-label" });
-      lbl.textContent = opts.band.label || "Totalidad";
+      lbl.textContent = b.label || "Totalidad";
       svg.appendChild(lbl);
     }
-  }
+  });
 
   svg.appendChild(svgEl("line", { x1: padL, x2: W - padR, y1: padT + plotH, y2: padT + plotH, class: "chart-baseline" }));
 
@@ -1274,7 +1283,10 @@ function render(snapshot) {
   document.getElementById("generated-at").textContent = fmtClock(new Date(snapshot.generated_at)) + " UTC (" + snapshot.dt + ")";
 
   const ph = eclipsePhases(snapshot.dt);
-  const band = { start: ph.totalityStart, end: ph.totalityEnd, label: snapshot.dt === "2026-08-12" ? "Totalidad" : "Totalidad (horario de simulacro)" };
+  const bands = [
+    { start: ph.tightStart, end: ph.tightEnd, label: "Captura de alta frecuencia", fill: "var(--hue-blue-dim)" },
+    { start: ph.totalityStart, end: ph.totalityEnd, label: snapshot.dt === "2026-08-12" ? "Totalidad" : "Totalidad (horario de simulacro)", fill: "var(--hue-gold-dim)" },
+  ];
   const S = {
     ree: filterRecords(snapshot.sources.ree, "ree", ph),
     aemet: filterRecords(snapshot.sources.aemet, "aemet", ph),
@@ -1302,7 +1314,7 @@ function render(snapshot) {
     { key: "trends", label: "Búsquedas", color: cssVar("--hue-violet") || "#9085e9", unit: "/100", digits: 0, points: trendsSeries },
     { key: "incidents", label: "Incidencias", color: cssVar("--status-crit") || "#e66767", unit: "", digits: 0, points: bucketCount(byCity(S.dgt_traffic), 15) },
   ];
-  renderComboChart(document.getElementById("combo-chart"), comboSeries, { band, pxHeight: 320 });
+  renderComboChart(document.getElementById("combo-chart"), comboSeries, { bands, pxHeight: 320 });
   document.getElementById("combo-legend").innerHTML = comboSeries.map(s => {
     const last = s.points[s.points.length - 1];
     const val = last ? fmtNum(last.y, s.digits) + s.unit : "—";
