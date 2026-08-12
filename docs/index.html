@@ -1207,13 +1207,15 @@ function renderComboChart(container, series, opts) {
   opts = opts || {};
   container.innerHTML = "";
 
-  // windowMs clamps to a recent rolling window, anchored to wall-clock now
-  // rather than the latest data point, so a stalled source shows up as a
-  // trailing gap instead of the chart silently rescaling to hide it.
+  // windowMs clamps to a recent rolling window, anchored to the latest
+  // received data point rather than wall-clock now — this is a static
+  // post-event snapshot, so "now" can be arbitrarily far past the last
+  // real reading, which left the default window empty.
   let windowed = series;
   let xMin, xMax;
   if (opts.windowMs) {
-    xMax = Date.now();
+    const allX = series.flatMap(s => s.points.map(p => p.x.getTime()));
+    xMax = allX.length ? Math.max(...allX) : Date.now();
     xMin = xMax - opts.windowMs;
     windowed = series.map(s => Object.assign({}, s, { points: s.points.filter(p => p.x.getTime() >= xMin) }));
   }
