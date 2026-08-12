@@ -571,6 +571,22 @@ const WINDOWS = {
   totalityEnd:   new Date("2026-08-12T18:35:00Z"),
 };
 
+const LIVE_SNAPSHOT_URL = "https://eclipse2026-public.s3.eu-west-1.amazonaws.com/latest.json";
+const LIVE_POLL_MS = 30000;
+
+async function loadLiveSnapshot() {
+  try {
+    const res = await fetch(LIVE_SNAPSHOT_URL, { cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    SNAPSHOT = data;
+    render(SNAPSHOT);
+  } catch (err) {
+    console.warn("live snapshot fetch failed, keeping last known data:", err);
+  }
+}
+setInterval(loadLiveSnapshot, LIVE_POLL_MS);
+
 const tooltip = document.getElementById("tooltip");
 
 function fmtNum(v, digits) {
@@ -698,7 +714,7 @@ function updateStatus() {
   } else if (now < WINDOWS.dryrunStart) {
     label = "Próximamente"; target = WINDOWS.totalityStart;
   } else if (now > WINDOWS.dryrunEnd && now < WINDOWS.eventStart) {
-    label = "Simulacro completado · evento mañana"; target = WINDOWS.eventStart;
+    label = "Simulacro completado · evento hoy"; target = WINDOWS.eventStart;
   } else {
     label = "Evento finalizado";
   }
@@ -1322,6 +1338,7 @@ function render(snapshot) {
 }
 
 render(SNAPSHOT);
+loadLiveSnapshot();
 </script>
 </body>
 </html>
