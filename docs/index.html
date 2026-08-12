@@ -582,6 +582,14 @@ const LIVE_SNAPSHOT_URL = "https://eclipse2026-public.s3.eu-west-1.amazonaws.com
 const LIVE_POLL_MS = 30000;
 
 async function loadLiveSnapshot() {
+  // Once a capture window has fully closed, the committed static snapshot
+  // (docs/snapshot-data.js) is the curated source of truth — polling the
+  // live S3 endpoint past that point would just clobber it with whatever
+  // stale data that bucket was last frozen at.
+  const now = new Date();
+  const capturing = (now >= WINDOWS.dryrunStart && now <= WINDOWS.dryrunEnd)
+    || (now >= WINDOWS.eventStart && now <= WINDOWS.eventEnd);
+  if (!capturing) return;
   try {
     const res = await fetch(LIVE_SNAPSHOT_URL, { cache: "no-store" });
     if (!res.ok) throw new Error("HTTP " + res.status);
