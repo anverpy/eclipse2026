@@ -894,17 +894,32 @@ const MAP_VIEWS = {
     },
   },
   activity: {
-    note: "Incidencias activas en carretera a lo largo del camino de totalidad.",
-    legend: { swatch: "#e66767", label: "Ubicación de incidencia" },
+    note: "Incidencias activas en carretera, total por zona a lo largo del camino de totalidad.",
+    legend: { label: "Menos → más incidencias", from: "#241118", to: "#e66767" },
     build() {
-      const markers = [];
-      if (FILTERS.sources.has("dgt_traffic")) {
-        latestByStation(lastSources.dgt_traffic).forEach(r => {
-          if (r.lat == null || r.lon == null) return;
-          markers.push({ lat: r.lat, lon: r.lon, value: "incidencia", color: "rgba(230,103,103,0.9)", city: nearestPathCity(r.lat, r.lon) });
-        });
-      }
-      return markers;
+      if (!FILTERS.sources.has("dgt_traffic")) return [];
+      // One marker per totality-path zone (not per incident): plotting every
+      // individual incident at its own coordinates got cluttered once several
+      // were active in the same city. latestByStation() dedupes first since
+      // DGT re-reports the same ongoing incident (same id + overallStartTime)
+      // on every poll while it stays active — without it, a single incident
+      // spanning several poll cycles would inflate its zone's count.
+      const counts = new Map(TOTALITY_PATH.map(c => [c.name, 0]));
+      latestByStation(lastSources.dgt_traffic).forEach(r => {
+        if (r.lat == null || r.lon == null) return;
+        const city = nearestPathCity(r.lat, r.lon);
+        if (city) counts.set(city, (counts.get(city) || 0) + 1);
+      });
+      const max = Math.max(1, ...counts.values());
+      return TOTALITY_PATH.map(c => {
+        const n = counts.get(c.name) || 0;
+        return {
+          lat: c.lat, lon: c.lng,
+          value: `${n} incidencia${n === 1 ? "" : "s"}`,
+          color: n === 0 ? "rgba(255,255,255,0.14)" : lerpColor("#241118", "#e66767", n / max),
+          city: c.name,
+        };
+      });
     },
   },
 };
