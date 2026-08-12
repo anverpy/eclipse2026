@@ -276,6 +276,7 @@
   .pct-row { border-bottom: 1px solid var(--border); font-size: 12.5px; }
   .pct-row:last-child { border-bottom: none; }
   .pct-name { font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 7px; }
+  .pct-unit { font-weight: 400; font-size: 10.5px; color: var(--text-muted); }
   .pct-val { text-align: center; font-variant-numeric: tabular-nums; color: var(--text-secondary); }
   .pct-val.is-zero { color: var(--text-muted); opacity: 0.5; }
   @media (max-width: 480px) { .pct-head, .pct-row { grid-template-columns: 1fr repeat(4, 42px); font-size: 11px; } }
@@ -1143,11 +1144,11 @@ function renderPhaseCompare(snapshot, ph) {
    comparison above (national sources — REE, Trends — aren't city-filtered),
    and same deliberate independence from the "Ventana temporal" filter. */
 const SOURCE_META = [
-  { key: "ree",         label: "REE",         emoji: "⚡", cityScoped: false },
-  { key: "aemet",       label: "AEMET",       emoji: "🌡️", cityScoped: true },
-  { key: "dgt_traffic", label: "DGT Tráfico", emoji: "🚦", cityScoped: true },
-  { key: "dgt_camera",  label: "DGT Cámaras", emoji: "☀️", cityScoped: true },
-  { key: "trends",      label: "Trends",      emoji: "🔍", cityScoped: false },
+  { key: "ree",         label: "REE",         emoji: "⚡", cityScoped: false, unit: "MW" },
+  { key: "aemet",       label: "AEMET",       emoji: "🌡️", cityScoped: true,  unit: "°C" },
+  { key: "dgt_traffic", label: "DGT Tráfico", emoji: "🚦", cityScoped: true,  unit: "incidencias" },
+  { key: "dgt_camera",  label: "DGT Cámaras", emoji: "☀️", cityScoped: true,  unit: "brillo" },
+  { key: "trends",      label: "Trends",      emoji: "🔍", cityScoped: false, unit: "índice" },
 ];
 function phaseCounts(records, ph) {
   const c = { antes: 0, parcial: 0, totalidad: 0, despues: 0 };
@@ -1166,7 +1167,7 @@ function renderPhaseCounts(snapshot, ph) {
   const rows = active.map(s => {
     const records = s.cityScoped ? byCity(snapshot.sources[s.key]) : snapshot.sources[s.key];
     const c = phaseCounts(records, ph);
-    return `<div class="pct-row"><span class="pct-name">${s.emoji} ${s.label}</span>${cell(c.antes)}${cell(c.parcial)}${cell(c.totalidad)}${cell(c.despues)}</div>`;
+    return `<div class="pct-row"><span class="pct-name">${s.emoji} ${s.label}<span class="pct-unit">${s.unit}</span></span>${cell(c.antes)}${cell(c.parcial)}${cell(c.totalidad)}${cell(c.despues)}</div>`;
   }).join("");
   el.innerHTML = `<div class="pct-head"><span></span><span>Antes</span><span>Parcial</span><span>Totalidad</span><span>Después</span></div>${rows}`;
 }
